@@ -58,6 +58,10 @@ class Menu(Scene):
     disabled_fg = (0.4, 0.4, 0.4)
     selected_fg = (0.01, 0.01, 0.01)
 
+    # Thickness of the ring around the edge of the sceen that we can use
+    # to render the menu
+    width = 25
+
     def __init__(self, message, options, callback):
         self.message = message
         self.options = options
@@ -94,7 +98,7 @@ class Menu(Scene):
         # or message, the menu options will be drawn in the outside perimeter
         ctx.begin_path()
         ctx.rectangle(-120, -120, 240, 240)
-        ctx.arc(0, 0, 95, 0, math.pi * 2, True)
+        ctx.arc(0, 0, 120 - Menu.width, 0, math.pi * 2, True)
         ctx.close_path().clip()
 
         # Render the options
@@ -109,9 +113,9 @@ class Menu(Scene):
 
         # Size of the arc in radians needed to highlight all of the text
         # Angle in radians is arc length over circle radius
-        arc_extent = ctx.text_width(" {} ".format(option['name'])) / 120
+        arc_extent = ctx.text_width(option['name']) / 120
 
-        # Margin is used to centre the arc within the hex interval associated
+        # Margin in radians used to centre the arc within the hex interval
         # associated with the botton position
         margin = (HEX_INTERVAL - arc_extent) / 2
 
@@ -126,10 +130,20 @@ class Menu(Scene):
             # Offset the position by -2 for drawing the arc because the vector
             # in the direction of zero radians points right instead of up and
             # we consider the "A" button to be at position 0
-            ctx.rotate((pos - 2) * HEX_INTERVAL).begin_path()
+            ctx.rotate((pos - 2) * HEX_INTERVAL)
+            # Draw the highlight arc
             ctx.begin_path()
             ctx.move_to(0, 0).arc(0, 0, 120, margin, HEX_INTERVAL - margin, False)
             ctx.close_path().fill()
+            # Give the highlight rounded ends by adding a circle to each end
+            # of the highlight arc
+            end_radius = Menu.width / 2
+            arc_start_x = math.cos(margin) * (120 - end_radius)
+            arc_start_y = math.sin(margin) * (120 - end_radius)
+            ctx.arc(arc_start_x, arc_start_y, end_radius, 0, math.pi * 2, False).fill()
+            arc_end_x = math.cos(HEX_INTERVAL - margin) * (120 - end_radius)
+            arc_end_y = math.sin(HEX_INTERVAL - margin) * (120 - end_radius)
+            ctx.arc(arc_end_x, arc_end_y, end_radius, 0, math.pi * 2, False).fill()
             ctx.restore()
 
         # Choose foreground colour
