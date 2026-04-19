@@ -10,9 +10,20 @@ License: MIT
 import math
 import os
 import random
+import sys
 
 import app
+from system.eventbus import eventbus
+from system.patterndisplay.events import *
+from system.scheduler.events import *
+from events.input import ButtonDownEvent, ButtonUpEvent, BUTTON_TYPES
 
+TITLE_IMG = "/apps/mbooth101_emf_settlers/title.png"
+if os.getcwd() != "/":
+    TITLE_IMG = os.getcwd() + TITLE_IMG
+
+# Radians between points on a hexagon
+HEX_INTERVAL = (math.pi * 2) / 6
 
 # Kinds of resource
 SHEEP = {'kind':0, 'col': (0xd4, 0xe1, 0x57)}
@@ -22,6 +33,167 @@ BRICK = {'kind':3, 'col': (0xff, 0x00, 0x00)}
 ORE = {'kind':4, 'col': (0x75, 0x75, 0x75)}
 DESERT = {'kind':5, 'col': (0xff, 0xee, 0x55)}  # Not really a resource
 RESOURCE_KINDS = [ SHEEP, WHEAT, WOOD, BRICK, ORE ]
+
+class Scene:
+
+    def update(self, delta):
+        """Updates the state of the current scene"""
+        pass
+
+    def draw(self, ctx):
+        """Renders the current scene to the screen"""
+        pass
+
+    def handle_button_down(self, event: ButtonDownEvent):
+        pass
+
+    def handle_button_up(self, event: ButtonUpEvent):
+        pass
+
+
+class Menu(Scene):
+
+    # Menu text colours
+    enabled_fg = (0.8, 0.8, 0.8)
+    disabled_fg = (0.4, 0.4, 0.4)
+    selected_fg = (0.01, 0.01, 0.01)
+
+    def __init__(self, message, options, callback):
+        self.message = message
+        self.options = options
+        self.callback = callback
+        self.selection = -1
+
+    @staticmethod
+    def is_option_disabled(opt):
+        return opt['disabled'] if 'disabled' in opt else False
+
+    def update(self, delta):
+        pass
+
+    def draw(self, ctx):
+        ctx.save()
+
+        ctx.text_align = ctx.CENTER
+
+        # Render message or title card if no message, either way we should
+        # cover the whole screen to avoid seeing the system menu
+        if self.message:
+            ctx.font_size = 30
+            ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+            ctx.rgb(*Menu.enabled_fg).move_to(0, 0).text(self.message)
+        else:
+            # XXX: Avoid drawing images in the simulator due to bug
+            # https://github.com/emfcamp/badge-2024-software/issues/269
+            if sys.implementation.name == "micropython":
+                ctx.image(TITLE_IMG, -120, -120, 240, 240)
+            else:
+                ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+
+        # Define clip space so subsequent ops don't overwrite the title card
+        # or message, the menu options will be drawn in the outside perimeter
+        ctx.begin_path()
+        ctx.rectangle(-120, -120, 240, 240)
+        ctx.arc(0, 0, 95, 0, math.pi * 2, True)
+        ctx.close_path().clip()
+
+        # Render the options
+        for idx, option in enumerate(self.options):
+            self.draw_option(ctx, option, idx == self.selection)
+
+        ctx.restore()
+
+    def draw_option(self, ctx, option, selected):
+        ctx.save()
+        ctx.font_size = 18
+
+        # Size of the arc in radians needed to highlight all of the text
+        # Angle in radians is arc length over circle radius
+        arc_extent = ctx.text_width(" {} ".format(option['name'])) / 120
+
+        # Margin is used to centre the arc within the hex interval associated
+        # associated with the botton position
+        margin = (HEX_INTERVAL - arc_extent) / 2
+
+        # Ordinal position of the button for the current option
+        pos = ord(option['btn']) - 65
+
+        # Render the selection highlight as a sector of a circle that is
+        # truncated by the clip mask
+        if selected:
+            ctx.save()
+            ctx.rgb(*Menu.enabled_fg)
+            # Offset the position by -2 for drawing the arc because the vector
+            # in the direction of zero radians points right instead of up and
+            # we consider the "A" button to be at position 0
+            ctx.rotate((pos - 2) * HEX_INTERVAL).begin_path()
+            ctx.begin_path()
+            ctx.move_to(0, 0).arc(0, 0, 120, margin, HEX_INTERVAL - margin, False)
+            ctx.close_path().fill()
+            ctx.restore()
+
+        # Choose foreground colour
+        if Menu.is_option_disabled(option):
+            ctx.rgb(*Menu.disabled_fg)
+        else:
+            if selected:
+                ctx.rgb(*Menu.selected_fg)
+            else:
+                ctx.rgb(*Menu.enabled_fg)
+
+        # Render the indicator arrow
+        ctx.rotate(pos * HEX_INTERVAL).translate(0, -115)
+        ctx.begin_path()
+        ctx.move_to(0, -5).line_to(-10, 0).line_to(10, 0)
+        ctx.close_path().fill()
+
+        # Render option text, rotating by 180 degrees for the lower buttons
+        if pos in [2,3,4]:
+            ctx.rotate(math.pi).move_to(0, -5).text(option['name'])
+        else:
+            ctx.move_to(0, 15).text(option['name'])
+
+        ctx.restore()
+
+    def handle_button_down(self, event: ButtonDownEvent):
+        btn = event.button.name
+        for idx, opt in enumerate(self.options):
+            if opt['btn'] == btn and not Menu.is_option_disabled(opt):
+                self.selection = idx
+
+    def handle_button_up(self, event: ButtonUpEvent):
+        if (self.callback and self.selection >= 0):
+            self.callback(self.selection)
+        self.selection = -1
+
+
+class MainMenu(Menu):
+    BACK = 0
+    NEW_GAME = 1
+    CONTINUE = 2
+
+    def __init__(self, callback, can_continue=False):
+        options = [
+            {'btn': "F", 'name': "Back"},
+            {'btn': "E", 'name': "New Game"},
+            {'btn': "C", 'name': "Continue Game", 'disabled': not can_continue},
+            ]
+        super().__init__(None, options, callback)
+
+
+class NumPlayersMenu(Menu):
+    BACK = 0
+    # No further constants, the chosen option index is the number of players
+
+    def __init__(self, callback):
+        options = [
+            {'btn': "F", 'name': "Back"},
+            {'btn': "A", 'name': "1 Player"},
+            {'btn': "B", 'name': "2 Players"},
+            {'btn': "C", 'name': "3 Players"},
+            {'btn': "D", 'name': "4 Players"},
+            ]
+        super().__init__(None, options, callback)
 
 
 class Hex:
@@ -146,13 +318,71 @@ class Hex:
 
 class Settlers(app.App):
 
+    # Game states
+    EXIT = 0
+    MAIN_MENU = 1
+    NUM_PLAYERS_MENU = 2
+
     def __init__(self):
-        self.hex = Hex([0, 0, 0], SHEEP, {'roll':3, 'prob':2}, True)
+        self.exit = False
+
+        self.scene = None
+        self.state = None
+        self.state_prev = None
+        self.enter_state(Settlers.MAIN_MENU)
+
+        # Register for button events
+        eventbus.on_async(ButtonDownEvent, self._button_down, self)
+        eventbus.on_async(ButtonUpEvent, self._button_up, self)
+
+        # Register for app stack events
+        eventbus.on_async(RequestForegroundPushEvent, self._resume, self)
+        eventbus.on_async(RequestForegroundPopEvent, self._pause, self)
+        eventbus.emit(PatternDisable())
+
+    def enter_state(self, state):
+        self.state_prev = self.state
+        self.state = state
+        if self.state == Settlers.MAIN_MENU:
+            self.scene = MainMenu(self.main_menu_cb, True)
+        if self.state == Settlers.NUM_PLAYERS_MENU:
+            self.scene = NumPlayersMenu(self.num_players_menu_cb)
+
+    def main_menu_cb(self, choice):
+        if choice == MainMenu.BACK:
+            self.exit = True
+        if choice == MainMenu.NEW_GAME:
+            self.enter_state(Settlers.NUM_PLAYERS_MENU)
+
+    def num_players_menu_cb(self, choice):
+        if choice == NumPlayersMenu.BACK:
+            self.enter_state(Settlers.MAIN_MENU)
+
+    async def _button_down(self, event: ButtonDownEvent):
+        # Send event to current active scene
+        self.scene.handle_button_down(event)
+
+    async def _button_up(self, event: ButtonUpEvent):
+        # Send event to current active scene
+        self.scene.handle_button_up(event)
+
+    async def _resume(self, event: RequestForegroundPushEvent):
+        # Disable firmware led pattern when foregrounded
+        eventbus.emit(PatternDisable())
+
+    async def _pause(self, event: RequestForegroundPopEvent):
+        # Renable firmware led pattern when backgrounded
+        eventbus.emit(PatternEnable())
 
     def update(self, delta):
-        pass
+        if self.exit:
+            self.exit = False
+            self.minimise()
+
+        self.scene.update(delta)
+        return True
 
     def draw(self, ctx):
-        self.hex.draw(ctx)
+        self.scene.draw(ctx)
 
 __app_export__ = Settlers
