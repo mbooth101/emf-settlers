@@ -65,7 +65,13 @@ class Menu(Scene):
     width = 25
 
     def __init__(self, message, options, callback):
-        self.message = message
+        # The ctx library does not handle strings with newlines well so
+        # lets split up the lines and we'll draw each line individually
+        # TODO: Fix centred text containing newlines in uctx
+        if not message:
+            self.message = []
+        else:
+            self.message = message.splitlines()
         self.options = options
         self.callback = callback
         self.selection = -1
@@ -81,13 +87,24 @@ class Menu(Scene):
         ctx.save()
 
         ctx.text_align = ctx.CENTER
+        ctx.text_baseline = ctx.MIDDLE
 
         # Render message or title card if no message, either way we should
         # cover the whole screen to avoid seeing the system menu
         if self.message:
             ctx.font_size = 30
             ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-            ctx.rgb(*Menu.enabled_fg).move_to(0, 0).text(self.message)
+            ctx.rgb(*Menu.enabled_fg)
+            # Calculate offset to centre multi-line messages vertically
+            if len(self.message) % 2 == 1:
+                line_offset = ((len(self.message) - 1) / 2) * ctx.font_size
+            else:
+                line_offset = (len(self.message) / 2) * ctx.font_size - 0.5 * ctx.font_size
+            # Message consists of a list of lines, because uctx doesn't treat
+            # newlines well for centred text
+            # TODO: Fix centred text containing newlines in uctx
+            for idx, line in enumerate(self.message):
+                ctx.move_to(0, idx * ctx.font_size - line_offset).text(line)
         else:
             # XXX: Avoid drawing images in the simulator due to bug
             # https://github.com/emfcamp/badge-2024-software/issues/269
@@ -165,9 +182,9 @@ class Menu(Scene):
 
         # Render option text, rotating by 180 degrees for the lower buttons
         if pos in [2,3,4]:
-            ctx.rotate(math.pi).move_to(0, -5).text(option['name'])
+            ctx.rotate(math.pi).move_to(0, -10).text(option['name'])
         else:
-            ctx.move_to(0, 15).text(option['name'])
+            ctx.move_to(0, 10).text(option['name'])
 
         ctx.restore()
 
