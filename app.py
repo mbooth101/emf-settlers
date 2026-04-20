@@ -211,6 +211,20 @@ class NumPlayersMenu(Menu):
         super().__init__(None, options, callback)
 
 
+class PlayerColourMenu(Menu):
+    BACK = 0
+
+    def __init__(self, callback, player):
+        options = [
+            {'btn': "F", 'name': "Back"},
+            {'btn': "A", 'name': "Red"},
+            {'btn': "B", 'name': "Blue"},
+            {'btn': "C", 'name': "Purple"},
+            {'btn': "D", 'name': "Orange"},
+            ]
+        super().__init__(f"Player {player},\nchoose your\ncolour:", options, callback)
+
+
 class Hex:
     """Hexes are the games tiles. They have a resource kind, correspond to the value
     of a roll of two D6 and may or may not contain the robber."""
@@ -336,11 +350,13 @@ class Settlers(app.App):
     # Game states
     MAIN_MENU = 1
     NUM_PLAYERS_MENU = 2
+    PLAYER_COLOUR_MENU = 3
 
     def __init__(self):
         self.exit = False
 
         self.scene = None
+        self.num_players = 0
 
         # State machine tracking
         self.state_prev = None
@@ -369,6 +385,13 @@ class Settlers(app.App):
     def num_players_menu_cb(self, choice):
         if choice == NumPlayersMenu.BACK:
             self.state_next = Settlers.MAIN_MENU
+        else:
+            self.num_players = choice
+            self.state_next = Settlers.PLAYER_COLOUR_MENU
+
+    def player_colour_menu_cb(self, choice):
+        if choice == PlayerColourMenu.BACK:
+            self.state_next = Settlers.NUM_PLAYERS_MENU
 
     def _button_down(self, event: ButtonDownEvent):
         button = event.button.name
@@ -401,6 +424,8 @@ class Settlers(app.App):
             self.scene = MainMenu(self.main_menu_cb, True)
         if self.state == Settlers.NUM_PLAYERS_MENU:
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
+        if self.state == Settlers.PLAYER_COLOUR_MENU:
+            self.scene = PlayerColourMenu(self.player_colour_menu_cb, self.num_players)
         self.state_next = None
 
     def update(self, delta):
