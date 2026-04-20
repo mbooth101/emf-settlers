@@ -44,10 +44,12 @@ class Scene:
         """Renders the current scene to the screen"""
         pass
 
-    def handle_button_down(self, event: ButtonDownEvent):
+    def handle_button_pressed(self, button):
+        """Called when a button is pressed"""
         pass
 
-    def handle_button_up(self, event: ButtonUpEvent):
+    def handle_button_released(self, button):
+        """Called when a button is released"""
         pass
 
 
@@ -169,13 +171,12 @@ class Menu(Scene):
 
         ctx.restore()
 
-    def handle_button_down(self, event: ButtonDownEvent):
-        btn = event.button.name
+    def handle_button_pressed(self, button):
         for idx, opt in enumerate(self.options):
-            if opt['btn'] == btn and not Menu.is_option_disabled(opt):
+            if opt['btn'] == button and not Menu.is_option_disabled(opt):
                 self.selection = idx
 
-    def handle_button_up(self, event: ButtonUpEvent):
+    def handle_button_released(self, button):
         if (self.callback and self.selection >= 0):
             self.callback(self.selection)
         self.selection = -1
@@ -333,7 +334,6 @@ class Hex:
 class Settlers(app.App):
 
     # Game states
-    EXIT = 0
     MAIN_MENU = 1
     NUM_PLAYERS_MENU = 2
 
@@ -341,44 +341,50 @@ class Settlers(app.App):
         self.exit = False
 
         self.scene = None
-        self.state = None
-        self.state_prev = None
-        self.enter_state(Settlers.MAIN_MENU)
 
-        # Register for button events
-        eventbus.on_async(ButtonDownEvent, self._button_down, self)
-        eventbus.on_async(ButtonUpEvent, self._button_up, self)
+        # State machine tracking
+        self.state_prev = None
+        self.state = None
+        self.state_next = Settlers.MAIN_MENU
+
+        # Tracked button state
+        self.buttons = {}
+
+        # Register for synchronous button events, there's too much input lag
+        # if we did this asynchronously
+        eventbus.on(ButtonDownEvent, self._button_down, self)
+        eventbus.on(ButtonUpEvent, self._button_up, self)
 
         # Register for app stack events
         eventbus.on_async(RequestForegroundPushEvent, self._resume, self)
         eventbus.on_async(RequestForegroundPopEvent, self._pause, self)
         eventbus.emit(PatternDisable())
 
-    def enter_state(self, state):
-        self.state_prev = self.state
-        self.state = state
-        if self.state == Settlers.MAIN_MENU:
-            self.scene = MainMenu(self.main_menu_cb, True)
-        if self.state == Settlers.NUM_PLAYERS_MENU:
-            self.scene = NumPlayersMenu(self.num_players_menu_cb)
-
     def main_menu_cb(self, choice):
         if choice == MainMenu.BACK:
             self.exit = True
         if choice == MainMenu.NEW_GAME:
-            self.enter_state(Settlers.NUM_PLAYERS_MENU)
+            self.state_next = Settlers.NUM_PLAYERS_MENU
 
     def num_players_menu_cb(self, choice):
         if choice == NumPlayersMenu.BACK:
-            self.enter_state(Settlers.MAIN_MENU)
+            self.state_next = Settlers.MAIN_MENU
 
-    async def _button_down(self, event: ButtonDownEvent):
-        # Send event to current active scene
-        self.scene.handle_button_down(event)
+    def _button_down(self, event: ButtonDownEvent):
+        button = event.button.name
+        # Send pressed event to current active scene only if the button was
+        # not already down (i.e. avoid repeat events for a held button)
+        if button not in self.buttons or not self.buttons[button]:
+            self.buttons[button] = True
+            self.scene.handle_button_pressed(button)
 
-    async def _button_up(self, event: ButtonUpEvent):
-        # Send event to current active scene
-        self.scene.handle_button_up(event)
+    def _button_up(self, event: ButtonUpEvent):
+        button = event.button.name
+        # Send released event to current active scene only if the button was
+        # previously pressed
+        if button in self.buttons and self.buttons[button]:
+            self.buttons[button] = False
+            self.scene.handle_button_released(button)
 
     async def _resume(self, event: RequestForegroundPushEvent):
         # Disable firmware led pattern when foregrounded
@@ -388,10 +394,22 @@ class Settlers(app.App):
         # Renable firmware led pattern when backgrounded
         eventbus.emit(PatternEnable())
 
+    def enter_state(self):
+        self.state_prev = self.state
+        self.state = self.state_next
+        if self.state == Settlers.MAIN_MENU:
+            self.scene = MainMenu(self.main_menu_cb, True)
+        if self.state == Settlers.NUM_PLAYERS_MENU:
+            self.scene = NumPlayersMenu(self.num_players_menu_cb)
+        self.state_next = None
+
     def update(self, delta):
         if self.exit:
             self.exit = False
             self.minimise()
+
+        if self.state_next:
+            self.enter_state()
 
         self.scene.update(delta)
         return True
