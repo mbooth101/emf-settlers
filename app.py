@@ -25,14 +25,6 @@ if os.getcwd() != "/":
 # Radians between points on a hexagon
 HEX_INTERVAL = (math.pi * 2) / 6
 
-# Kinds of resource
-SHEEP = {'kind':0, 'col': (0xd4, 0xe1, 0x57)}
-WHEAT = {'kind':1, 'col': (0xff, 0xc1, 0x07)}
-WOOD = {'kind':2, 'col': (0x99, 0x33, 0x00)}
-BRICK = {'kind':3, 'col': (0xff, 0x00, 0x00)}
-ORE = {'kind':4, 'col': (0x75, 0x75, 0x75)}
-DESERT = {'kind':5, 'col': (0xff, 0xee, 0x55)}  # Not really a resource
-RESOURCE_KINDS = [ SHEEP, WHEAT, WOOD, BRICK, ORE ]
 
 
 def html_to_rgb(html):
@@ -274,10 +266,10 @@ class PlayerColourMenu(Menu):
     def __init__(self, callback):
         options = [
             {'btn': "F", 'name': "Back"},
-            {'btn': "A", 'name': "  Red  ", 'col': html_to_rgb("#FF1540")},
-            {'btn': "B", 'name': " Blue ", 'col': html_to_rgb("#15B5FF")},
-            {'btn': "C", 'name': "Purple", 'col': html_to_rgb("#D415FF")},
-            {'btn': "D", 'name': "Orange", 'col': html_to_rgb("#FF5F15")},
+            {'btn': "A", 'name': "  Red  ", 'col': html_to_rgb('#FF1540')},
+            {'btn': "B", 'name': " Blue ", 'col': html_to_rgb('#15B5FF')},
+            {'btn': "C", 'name': "Purple", 'col': html_to_rgb('#D415FF')},
+            {'btn': "D", 'name': "Orange", 'col': html_to_rgb('#FF5F15')},
             ]
         super().__init__(options, callback)
 
@@ -393,7 +385,7 @@ class Hex:
 
         # Draw label
         if self.highlight:
-            ctx.rgb(255, 255, 255)
+            ctx.rgb(1, 1, 1)
         else:
             ctx.rgb(0, 0, 0)
         ctx.text_align = ctx.CENTER
@@ -402,16 +394,102 @@ class Hex:
             ctx.move_to(self.centre[0], self.centre[1] + 7).text("Rob")
         else:
             ctx.font_size = 30
-            if self.resource != DESERT:
+            if self.resource != GameBoard.DESERT:
                 ctx.move_to(self.centre[0], self.centre[1] + 10).text("{}".format(self.number['roll']))
 
-class Game(Scene):
+
+class GameBoard(Scene):
+
+    # Kinds of resource
+    SHEEP = {'kind':0, 'col': html_to_rgb('#d4e157')}
+    WHEAT = {'kind':1, 'col': html_to_rgb('#ffc107')}
+    WOOD = {'kind':2, 'col': html_to_rgb('#993300')}
+    BRICK = {'kind':3, 'col': html_to_rgb('#ff0000')}
+    ORE = {'kind':4, 'col': html_to_rgb('#757575')}
+    DESERT = {'kind':5, 'col': html_to_rgb('#ffee55')}  # Not really a resource
+    RESOURCE_KINDS = [SHEEP, WHEAT, WOOD, BRICK, ORE]
+
+    # List of resources (pre-randomised to combat the not-very random number
+    # generator) that make up the hexes on the game board for 4 players
+    resources = [ORE, SHEEP, WHEAT, ORE, ORE, WOOD, DESERT, BRICK, SHEEP, WOOD,
+                 WHEAT, WOOD, WOOD, WHEAT, SHEEP, BRICK, SHEEP, BRICK, WHEAT]
+
+    # Dice roll probabilities
+    TWO = {'roll':2, 'prob':1}
+    THREE = {'roll':3, 'prob':2}
+    FOUR = {'roll':4, 'prob':3}
+    FIVE = {'roll':5, 'prob':4}
+    SIX = {'roll':6, 'prob':5}
+    SEVEN = {'roll':7, 'prob':0}  # Most probable, but zero because desert
+    EIGHT = {'roll':8, 'prob':5}
+    NINE = {'roll':9, 'prob':4}
+    TEN = {'roll':10, 'prob':3}
+    ELEVEN = {'roll':11, 'prob':2}
+    TWELVE = {'roll':12, 'prob':1}
+
+    # Dice rolls for (these have a strict order) to be assigned to the resource
+    # hexes for 4 player games
+    numbers = [FIVE, TWO, SIX, THREE, EIGHT, TEN, NINE, TWELVE, ELEVEN, FOUR,
+               EIGHT, TEN, NINE, FOUR, FIVE, SIX, THREE, ELEVEN]
+
+    def __init__(self, players):
+        self.players = players
+
+        # Two rings of hexes around the centre
+        radius = 2
+
+        # Choose a starting hex on the outermost ring of hexes
+        choice = random.randrange(0, 6)
+        coords = [0, 0, 0]
+        for i in range(radius):
+            coords = [a + b for a, b in zip(coords, Hex.directions[choice])]
+
+        # Copy lists so we can edit them with impunity
+        r_copy = GameBoard.resources.copy()
+        n_copy = GameBoard.numbers.copy()
+
+        # Create the board
+        self.hexes = []
+        while radius > 0:
+            # From the starting hex, go radius hexes in each of the 6 directions
+            for i in list(range((choice + 2) % 6, 6)) + list(range(0, (choice + 2) % 6)):
+                for _ in range(radius):
+                    # The resources are picked at random from the list
+                    resource = r_copy.pop(random.randrange(0, len(r_copy)))
+                    # But the dice roll numbers are picked in order, unless it's
+                    # the desert in which case that is always 7
+                    number = GameBoard.SEVEN
+                    if resource['kind'] != 5:
+                        number = n_copy.pop(0)
+                    self.hexes.append(Hex(coords, resource, number, number['roll'] == 7))
+                    coords = Hex.get_neighbouring_hex_coords(coords, i)
+
+            # Go into the next ring of hexes (opposite direction of starting choice)
+            coords = Hex.get_neighbouring_hex_coords(coords, (choice + 3) % 6)
+            radius = radius - 1
+        # The final, centre hex
+        resource = r_copy.pop()
+        number = GameBoard.SEVEN
+        if resource['kind'] != 5:
+            number = n_copy.pop(0)
+        self.hexes.append(Hex(coords, resource, number, number['roll'] == 7))
 
     def update(self, delta):
         pass
 
     def draw(self, ctx):
+        ctx.save()
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        for h in self.hexes:
+            h.draw(ctx)
+        ctx.restore()
+
+
+class Player:
+    """The player's hand of resource cards and their score and what not."""
+
+    def __init__(self, colour):
+        self.colour = colour
 
 class Settlers(app.App):
 
@@ -465,7 +543,8 @@ class Settlers(app.App):
         if choice == PlayerColourMenu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
         else:
-            self.players.append({})
+            colour = self.scene.options[choice]['col']
+            self.players.append(Player(colour))
             if len(self.players) < self.num_players:
                 # If we've not yet selected colours for all the players,
                 # disable the one that was just chosen, update the menu
@@ -521,7 +600,7 @@ class Settlers(app.App):
         if self.state == Settlers.PLAYER_COLOUR_MENU:
             self.scene = PlayerColourMenu(self.player_colour_menu_cb)
         if self.state == Settlers.GAME:
-            self.scene = Game()
+            self.scene = GameBoard(self.players)
 
     def update(self, delta):
         if self.exit:
