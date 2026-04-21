@@ -76,6 +76,16 @@ class Menu(Scene):
         self.callback = callback
         self.selection = -1
 
+    def set_disabled(self, indices):
+        """Set disabled flag on options corresponding to the given list of indices"""
+        if isinstance(indices, list):
+            for idx in indices:
+                self.options[idx]['disabled'] = True
+
+    def get_disabled(self):
+        """Return list of indices of options that have the disabled flag set"""
+        return [idx for idx, option in enumerate(self.options) if Menu.is_option_disabled(option)]
+
     @staticmethod
     def is_option_disabled(opt):
         return opt['disabled'] if 'disabled' in opt else False
@@ -200,15 +210,15 @@ class Menu(Scene):
 
 
 class MainMenu(Menu):
-    BACK = 0
+    EXIT = 0
     NEW_GAME = 1
     CONTINUE = 2
 
-    def __init__(self, callback, can_continue=False):
+    def __init__(self, callback):
         options = [
-            {'btn': "F", 'name': "Back"},
+            {'btn': "F", 'name': "Exit"},
             {'btn': "E", 'name': "New Game"},
-            {'btn': "C", 'name': "Continue Game", 'disabled': not can_continue},
+            {'btn': "C", 'name': "Continue Game"},
             ]
         super().__init__(None, options, callback)
 
@@ -373,7 +383,9 @@ class Settlers(app.App):
         self.exit = False
 
         self.scene = None
+
         self.num_players = 0
+        self.players = []
 
         # State machine tracking
         self.state_prev = None
@@ -394,7 +406,7 @@ class Settlers(app.App):
         eventbus.emit(PatternDisable())
 
     def main_menu_cb(self, choice):
-        if choice == MainMenu.BACK:
+        if choice == MainMenu.EXIT:
             self.exit = True
         if choice == MainMenu.NEW_GAME:
             self.state_next = Settlers.NUM_PLAYERS_MENU
@@ -409,6 +421,9 @@ class Settlers(app.App):
     def player_colour_menu_cb(self, choice):
         if choice == PlayerColourMenu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
+        else:
+            if len(self.players) < self.num_players:
+                self.state_next = Settlers.PLAYER_COLOUR_MENU
 
     def _button_down(self, event: ButtonDownEvent):
         button = event.button.name
@@ -438,11 +453,13 @@ class Settlers(app.App):
         self.state_prev = self.state
         self.state = self.state_next
         if self.state == Settlers.MAIN_MENU:
-            self.scene = MainMenu(self.main_menu_cb, True)
+            self.scene = MainMenu(self.main_menu_cb)
+            # TODO Enable continue if game in progress
+            self.scene.set_disabled([MainMenu.CONTINUE])
         if self.state == Settlers.NUM_PLAYERS_MENU:
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
         if self.state == Settlers.PLAYER_COLOUR_MENU:
-            self.scene = PlayerColourMenu(self.player_colour_menu_cb, self.num_players)
+            self.scene = PlayerColourMenu(self.player_colour_menu_cb, len(self.players) + 1)
         self.state_next = None
 
     def update(self, delta):
