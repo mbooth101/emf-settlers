@@ -34,6 +34,16 @@ ORE = {'kind':4, 'col': (0x75, 0x75, 0x75)}
 DESERT = {'kind':5, 'col': (0xff, 0xee, 0x55)}  # Not really a resource
 RESOURCE_KINDS = [ SHEEP, WHEAT, WOOD, BRICK, ORE ]
 
+
+def html_to_rgb(html):
+    if html[0] == '#':
+        html = html[1:]
+    r = int(html[0:2], 16) / 255
+    g = int(html[2:4], 16) / 255
+    b = int(html[4:6], 16) / 255
+    return (r, g, b)
+
+
 class Scene:
 
     def update(self, delta):
