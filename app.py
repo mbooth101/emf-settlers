@@ -74,7 +74,14 @@ class Menu(Scene):
     # to render the menu
     width = 25
 
-    def __init__(self, message, options, callback):
+    def __init__(self, options, callback):
+        self.message = []
+        self.options = options
+        self.callback = callback
+        self.selection = -1
+
+    def set_message(self, message):
+        """Set the message or question to display for the menu"""
         # The ctx library does not handle strings with newlines well so
         # lets split up the lines and we'll draw each line individually
         # TODO: Fix centred text containing newlines in uctx
@@ -82,9 +89,6 @@ class Menu(Scene):
             self.message = []
         else:
             self.message = message.splitlines()
-        self.options = options
-        self.callback = callback
-        self.selection = -1
 
     def set_disabled(self, indices):
         """Set disabled flag on options corresponding to the given list of indices"""
@@ -230,7 +234,7 @@ class MainMenu(Menu):
             {'btn': "E", 'name': "New Game"},
             {'btn': "C", 'name': "Continue Game"},
             ]
-        super().__init__(None, options, callback)
+        super().__init__(options, callback)
 
 
 class NumPlayersMenu(Menu):
@@ -245,21 +249,24 @@ class NumPlayersMenu(Menu):
             {'btn': "C", 'name': "3 Players"},
             {'btn': "D", 'name': "4 Players"},
             ]
-        super().__init__(None, options, callback)
+        super().__init__(options, callback)
 
 
 class PlayerColourMenu(Menu):
     BACK = 0
 
-    def __init__(self, callback, player):
+    def __init__(self, callback):
         options = [
             {'btn': "F", 'name': "Back"},
-            {'btn': "A", 'name': "Red"},
-            {'btn': "B", 'name': "Blue"},
-            {'btn': "C", 'name': "Purple"},
-            {'btn': "D", 'name': "Orange"},
+            {'btn': "A", 'name': "Red", 'col': html_to_rgb("#FF1540")},
+            {'btn': "B", 'name': "Blue", 'col': html_to_rgb("#15B5FF")},
+            {'btn': "C", 'name': "Purple", 'col': html_to_rgb("#D415FF")},
+            {'btn': "D", 'name': "Orange", 'col': html_to_rgb("#FF5F15")},
             ]
-        super().__init__(f"Player {player},\nchoose your\ncolour:", options, callback)
+        super().__init__(options, callback)
+
+    def set_message_for_player(self, num):
+        self.set_message(f"Player {num},\nchoose your\ncolour:")
 
 
 class Hex:
@@ -382,16 +389,26 @@ class Hex:
             if self.resource != DESERT:
                 ctx.move_to(self.centre[0], self.centre[1] + 10).text("{}".format(self.number['roll']))
 
+class Game(Scene):
+
+    def update(self, delta):
+        pass
+
+    def draw(self, ctx):
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+
 class Settlers(app.App):
 
     # Game states
     MAIN_MENU = 1
     NUM_PLAYERS_MENU = 2
     PLAYER_COLOUR_MENU = 3
+    GAME = 4
 
     def __init__(self):
         self.exit = False
 
+        self.game = None
         self.scene = None
 
         self.num_players = 0
@@ -432,8 +449,18 @@ class Settlers(app.App):
         if choice == PlayerColourMenu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
         else:
+            self.players.append({})
             if len(self.players) < self.num_players:
+                # If we've not yet selected colours for all the players,
+                # disable the one that was just chosen, update the menu
+                # message, and round again
+                disabled = self.scene.get_disabled()
+                disabled.append(choice)
+                self.scene.set_disabled(disabled)
+                self.scene.set_message_for_player(len(self.players) + 1)
                 self.state_next = Settlers.PLAYER_COLOUR_MENU
+            else:
+                self.state_next = Settlers.GAME
 
     def _button_down(self, event: ButtonDownEvent):
         button = event.button.name
@@ -462,6 +489,13 @@ class Settlers(app.App):
     def enter_state(self):
         self.state_prev = self.state
         self.state = self.state_next
+        self.state_next = None
+
+        # Just exit early if the requested state is the same as the previous
+        if self.state == self.state_prev:
+            return
+
+        # Load the scene associated with the new state
         if self.state == Settlers.MAIN_MENU:
             self.scene = MainMenu(self.main_menu_cb)
             # TODO Enable continue if game in progress
@@ -469,8 +503,9 @@ class Settlers(app.App):
         if self.state == Settlers.NUM_PLAYERS_MENU:
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
         if self.state == Settlers.PLAYER_COLOUR_MENU:
-            self.scene = PlayerColourMenu(self.player_colour_menu_cb, len(self.players) + 1)
-        self.state_next = None
+            self.scene = PlayerColourMenu(self.player_colour_menu_cb)
+        if self.state == Settlers.GAME:
+            self.scene = Game()
 
     def update(self, delta):
         if self.exit:
