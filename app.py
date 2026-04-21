@@ -14,9 +14,9 @@ import sys
 
 import app
 from system.eventbus import eventbus
-from system.patterndisplay.events import *
-from system.scheduler.events import *
-from events.input import ButtonDownEvent, ButtonUpEvent, BUTTON_TYPES
+from system.patterndisplay.events import PatternEnable, PatternDisable
+from system.scheduler.events import RequestForegroundPushEvent, RequestForegroundPopEvent
+from events.input import ButtonDownEvent, ButtonUpEvent
 
 TITLE_IMG = "/apps/mbooth101_emf_settlers/title.png"
 if os.getcwd() != "/":
@@ -26,8 +26,8 @@ if os.getcwd() != "/":
 HEX_INTERVAL = (math.pi * 2) / 6
 
 
-
 def html_to_rgb(html):
+    """Utility function to convert a HTML-style hex colour code into an RGB tuple."""
     if html[0] == '#':
         html = html[1:]
     r = int(html[0:2], 16) / 255
@@ -37,25 +37,25 @@ def html_to_rgb(html):
 
 
 class Scene:
+    """A base class than contains the collection of game objects that will be
+    rendered together in a single distinct scene."""
 
     def update(self, delta):
         """Updates the state of the current scene"""
-        pass
 
     def draw(self, ctx):
         """Renders the current scene to the screen"""
-        pass
 
     def handle_button_pressed(self, button):
         """Called when a button is pressed"""
-        pass
 
     def handle_button_released(self, button):
         """Called when a button is released"""
-        pass
 
 
 class Menu(Scene):
+    """An abstract menu scene that renders its options around the outside of the
+    screen, one menu option can be assigned to each Tildagon button."""
 
     # Default menu item colours
     background = (0, 0, 0)
@@ -395,10 +395,13 @@ class Hex:
         else:
             ctx.font_size = 30
             if self.resource != GameBoard.DESERT:
-                ctx.move_to(self.centre[0], self.centre[1] + 10).text("{}".format(self.number['roll']))
+                ctx.move_to(self.centre[0], self.centre[1] + 10)
+                ctx.text(f"{self.number['roll']}")
 
 
 class GameBoard(Scene):
+    """A gameboard is made of hexes, roads, and settlements. It also contains
+    the players."""
 
     # Kinds of resource
     SHEEP = {'kind':0, 'col': html_to_rgb('#d4e157')}
@@ -433,6 +436,7 @@ class GameBoard(Scene):
                EIGHT, TEN, NINE, FOUR, FIVE, SIX, THREE, ELEVEN]
 
     def __init__(self, players):
+        """Creates a new game board for the given list of players."""
         self.players = players
 
         # Two rings of hexes around the centre
@@ -489,11 +493,13 @@ class Player:
     """The player's hand of resource cards and their score and what not."""
 
     def __init__(self, colour):
+        """Create a player that will be represented on screen by the given colour."""
         self.colour = colour
 
 class Settlers(app.App):
+    """Entry point, state machine that manages scene transitions, and user input management."""
 
-    # Game states
+    # Game scenes
     MAIN_MENU = 1
     NUM_PLAYERS_MENU = 2
     PLAYER_COLOUR_MENU = 3
@@ -616,4 +622,4 @@ class Settlers(app.App):
     def draw(self, ctx):
         self.scene.draw(ctx)
 
-__app_export__ = Settlers
+__app_export__ = Settlers # pylint: disable=invalid-name
