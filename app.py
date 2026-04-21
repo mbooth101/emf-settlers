@@ -549,6 +549,7 @@ class Settlers(app.App):
     def player_colour_menu_cb(self, choice):
         if choice == PlayerColourMenu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
+            self.players.clear()
         else:
             colour = self.scene.options[choice]['col']
             self.players.append(Player(colour))
