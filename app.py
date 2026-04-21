@@ -113,6 +113,23 @@ class Menu(Scene):
         ctx.text_align = ctx.CENTER
         ctx.text_baseline = ctx.MIDDLE
 
+        # Render the background
+        self.draw_background(ctx)
+
+        # Define clip space so subsequent ops don't overwrite the title card
+        # or message, the menu options will be drawn in the outside perimeter
+        ctx.begin_path()
+        ctx.rectangle(-120, -120, 240, 240)
+        ctx.arc(0, 0, 120 - Menu.width, 0, math.pi * 2, True)
+        ctx.close_path().clip()
+
+        # Render the options
+        for idx, option in enumerate(self.options):
+            self.draw_option(ctx, option, idx == self.selection)
+
+        ctx.restore()
+
+    def draw_background(self, ctx):
         # Render message or title card if no message, either way we should
         # cover the whole screen to avoid seeing the system menu
         if self.message:
@@ -136,19 +153,6 @@ class Menu(Scene):
                 ctx.image(TITLE_IMG, -120, -120, 240, 240)
             else:
                 ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-
-        # Define clip space so subsequent ops don't overwrite the title card
-        # or message, the menu options will be drawn in the outside perimeter
-        ctx.begin_path()
-        ctx.rectangle(-120, -120, 240, 240)
-        ctx.arc(0, 0, 120 - Menu.width, 0, math.pi * 2, True)
-        ctx.close_path().clip()
-
-        # Render the options
-        for idx, option in enumerate(self.options):
-            self.draw_option(ctx, option, idx == self.selection)
-
-        ctx.restore()
 
     def draw_option(self, ctx, option, selected):
         ctx.save()
