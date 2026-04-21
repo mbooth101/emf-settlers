@@ -65,7 +65,9 @@ class Scene:
 
 class Menu(Scene):
 
-    # Menu text colours
+    # Default menu item colours
+    background = (0, 0, 0)
+    highlight = (0.8, 0.8, 0.8)
     enabled_fg = (0.8, 0.8, 0.8)
     disabled_fg = (0.4, 0.4, 0.4)
     selected_fg = (0.01, 0.01, 0.01)
@@ -134,7 +136,7 @@ class Menu(Scene):
         # cover the whole screen to avoid seeing the system menu
         if self.message:
             ctx.font_size = 30
-            ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+            ctx.rgb(*Menu.background).rectangle(-120, -120, 240, 240).fill()
             ctx.rgb(*Menu.enabled_fg)
             # Calculate offset to centre multi-line messages vertically
             if len(self.message) % 2 == 1:
@@ -152,7 +154,7 @@ class Menu(Scene):
             if sys.implementation.name == "micropython":
                 ctx.image(TITLE_IMG, -120, -120, 240, 240)
             else:
-                ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+                ctx.rgb(*Menu.background).rectangle(-120, -120, 240, 240).fill()
 
     def draw_option(self, ctx, option, selected):
         ctx.save()
@@ -171,9 +173,15 @@ class Menu(Scene):
 
         # Render the selection highlight as a sector of a circle that is
         # truncated by the clip mask
-        if selected:
+        if not Menu.is_option_disabled(option):
             ctx.save()
-            ctx.rgb(*Menu.enabled_fg)
+            if selected:
+                ctx.rgb(*Menu.highlight)
+            else:
+                if 'col' in option:
+                    ctx.rgb(*option['col'])
+                else:
+                    ctx.rgb(*Menu.background)
             # Offset the position by -2 for drawing the arc because the vector
             # in the direction of zero radians points right instead of up and
             # we consider the "A" button to be at position 0
@@ -200,7 +208,11 @@ class Menu(Scene):
             if selected:
                 ctx.rgb(*Menu.selected_fg)
             else:
-                ctx.rgb(*Menu.enabled_fg)
+                if 'col' in option:
+                    # Just needs to contrast with the overridden bg colour
+                    ctx.rgb(0, 0, 0)
+                else:
+                    ctx.rgb(*Menu.enabled_fg)
 
         # Render the indicator arrow
         ctx.rotate(pos * HEX_INTERVAL).translate(0, -115)
@@ -262,8 +274,8 @@ class PlayerColourMenu(Menu):
     def __init__(self, callback):
         options = [
             {'btn': "F", 'name': "Back"},
-            {'btn': "A", 'name': "Red", 'col': html_to_rgb("#FF1540")},
-            {'btn': "B", 'name': "Blue", 'col': html_to_rgb("#15B5FF")},
+            {'btn': "A", 'name': "  Red  ", 'col': html_to_rgb("#FF1540")},
+            {'btn': "B", 'name': " Blue ", 'col': html_to_rgb("#15B5FF")},
             {'btn': "C", 'name': "Purple", 'col': html_to_rgb("#D415FF")},
             {'btn': "D", 'name': "Orange", 'col': html_to_rgb("#FF5F15")},
             ]
