@@ -272,6 +272,7 @@ class PlayerColourMenu(Menu):
             {'btn': "D", 'name': "Orange", 'col': html_to_rgb('#FF5F15')},
             ]
         super().__init__(options, callback)
+        self.set_message_for_player(1)
 
     def set_message_for_player(self, num):
         self.set_message(f"Player {num},\nchoose your\ncolour:")
