@@ -400,6 +400,75 @@ class Hex:
                 ctx.text(f"{self.number['roll']}")
 
 
+class Player:
+    """The player's hand of resource cards and their score and what not."""
+
+    def __init__(self, name, colour):
+        """Create a player that will be represented on screen by the given colour."""
+        self.name = name
+        self.colour = colour
+
+
+class Selectable:
+    """Base class for selectable locations on the game board."""
+
+    # Possible things this location may contain, the values here are the number of
+    # victory points that the building is worth to the player who built it
+    EMPTY = 0
+
+    def __init__(self, data):
+        # Screen coords that define the selectable object
+        self.data = data
+
+        # The list of hexes next to which this selectable object is adjacent
+        self.hexes = []
+
+        # What is built here and who owns it
+        self.player = None
+        self.contents = Selectable.EMPTY
+
+        # Whether to draw selection indicator
+        self.selected = False
+
+    def is_empty(self):
+        return self.contents == Selectable.EMPTY
+
+
+class Settlement(Selectable):
+    """A node at which it is possible to build a settlement."""
+
+    # Victory point value of settlements
+    TOWN = 1
+    CITY = 2
+
+    def build_town(self, player):
+        assert self.is_empty(), 'Town can only be built in empty location'
+        self.player = player
+        self.contents = Settlement.TOWN
+
+    def build_city(self, player):
+        assert self.contents == Settlement.TOWN and self.player.name == player.name, 'City can only be built in place of one of your own towns'
+        self.contents = Settlement.CITY
+
+    def draw(self, ctx):
+        pass
+
+
+class Road(Selectable):
+    """An edge along which it is possible to build a road."""
+
+    # Victory point value of roads
+    ROAD = 1
+
+    def build_road(self, player):
+        assert self.is_empty(), 'Road can only be built in empty location'
+        self.player = player
+        self.contents = Road.ROAD
+
+    def draw(self, ctx):
+        pass
+
+
 class GameBoard(Scene):
     """A gameboard is made of hexes, roads, and settlements. It also contains
     the players."""
@@ -479,6 +548,31 @@ class GameBoard(Scene):
             number = n_copy.pop(0)
         self.hexes.append(Hex(coords, resource, number, number['roll'] == 7))
 
+        # Generate lists of unique valid locations for building settlements and roads
+        self.roads = []
+        self.settlements = []
+        for h in self.hexes:
+            for edge in h.edges:
+                already_got = False
+                for r in self.roads:
+                    if r.data == edge:
+                        already_got = True
+                        r.hexes.append(h)
+                if not already_got:
+                    r = Road(edge)
+                    r.hexes.append(h)
+                    self.roads.append(r)
+            for node in h.nodes:
+                already_got = False
+                for s in self.settlements:
+                    if s.data == node:
+                        already_got = True
+                        s.hexes.append(h)
+                if not already_got:
+                    s = Settlement(node)
+                    s.hexes.append(h)
+                    self.settlements.append(s)
+
     def update(self, delta):
         pass
 
@@ -487,15 +581,12 @@ class GameBoard(Scene):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         for h in self.hexes:
             h.draw(ctx)
+        for r in self.roads:
+            r.draw(ctx)
+        for s in self.settlements:
+            s.draw(ctx)
         ctx.restore()
 
-
-class Player:
-    """The player's hand of resource cards and their score and what not."""
-
-    def __init__(self, colour):
-        """Create a player that will be represented on screen by the given colour."""
-        self.colour = colour
 
 class Settlers(app.App):
     """Entry point, state machine that manages scene transitions, and user input management."""
@@ -552,7 +643,8 @@ class Settlers(app.App):
             self.players.clear()
         else:
             colour = self.scene.options[choice]['col']
-            self.players.append(Player(colour))
+            player_num = len(self.players) + 1
+            self.players.append(Player(f"Player {player_num}", colour))
             if len(self.players) < self.num_players:
                 # If we've not yet selected colours for all the players,
                 # disable the one that was just chosen, update the menu
