@@ -22,8 +22,11 @@ TITLE_IMG = "/apps/mbooth101_emf_settlers/title.png"
 if os.getcwd() != "/":
     TITLE_IMG = os.getcwd() + TITLE_IMG
 
+# Radians in a full circle
+TAU = math.pi * 2
+
 # Radians between points on a hexagon
-HEX_INTERVAL = (math.pi * 2) / 6
+HEX_INTERVAL = TAU / 6
 
 
 def html_to_rgb(html):
@@ -114,7 +117,7 @@ class Menu(Scene):
         # or message, the menu options will be drawn in the outside perimeter
         ctx.begin_path()
         ctx.rectangle(-120, -120, 240, 240)
-        ctx.arc(0, 0, 120 - Menu.width, 0, math.pi * 2, True)
+        ctx.arc(0, 0, 120 - Menu.width, 0, TAU, True)
         ctx.close_path().clip()
 
         # Render the options
@@ -187,10 +190,10 @@ class Menu(Scene):
             end_radius = Menu.width / 2
             arc_start_x = math.cos(margin) * (120 - end_radius)
             arc_start_y = math.sin(margin) * (120 - end_radius)
-            ctx.arc(arc_start_x, arc_start_y, end_radius, 0, math.pi * 2, False).fill()
+            ctx.arc(arc_start_x, arc_start_y, end_radius, 0, TAU, False).fill()
             arc_end_x = math.cos(HEX_INTERVAL - margin) * (120 - end_radius)
             arc_end_y = math.sin(HEX_INTERVAL - margin) * (120 - end_radius)
-            ctx.arc(arc_end_x, arc_end_y, end_radius, 0, math.pi * 2, False).fill()
+            ctx.arc(arc_end_x, arc_end_y, end_radius, 0, TAU, False).fill()
             ctx.restore()
 
         # Choose foreground colour
@@ -349,7 +352,7 @@ class Hex:
         # Generate the list of screen coordinates for each of the corners of the hex
         self.nodes = []
         for i in range(0, 6):
-            angle = 2.0 * math.pi * (0 - i) / 6
+            angle = TAU * (0 - i) / 6
             offset = [Hex.size * math.cos(angle), Hex.size * math.sin(angle)]
             self.nodes.append([round(self.centre[0] + offset[0]), round(self.centre[1] + offset[1])])
 
