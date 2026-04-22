@@ -351,7 +351,7 @@ class Hex:
         for i in range(0, 6):
             angle = 2.0 * math.pi * (0 - i) / 6
             offset = [Hex.size * math.cos(angle), Hex.size * math.sin(angle)]
-            self.nodes.append([int(self.centre[0] + offset[0]), int(self.centre[1] + offset[1])])
+            self.nodes.append([round(self.centre[0] + offset[0]), round(self.centre[1] + offset[1])])
 
         # Generate the list of pairs of screen coordinates for each of the sides of the hex
         self.edges = []
