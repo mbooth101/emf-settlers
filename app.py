@@ -506,7 +506,7 @@ class GameBoard(Scene):
     the players."""
 
     # Kinds of resource
-    SHEEP = {'kind':0, 'col': html_to_rgb('#d4e157')}
+    SHEEP = {'kind':0, 'col': html_to_rgb('#228B22')}
     WHEAT = {'kind':1, 'col': html_to_rgb('#ffc107')}
     WOOD = {'kind':2, 'col': html_to_rgb('#993300')}
     BRICK = {'kind':3, 'col': html_to_rgb('#ff0000')}
