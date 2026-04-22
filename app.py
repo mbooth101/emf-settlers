@@ -392,14 +392,13 @@ class Hex:
             ctx.rgb(1, 1, 1)
         else:
             ctx.rgb(0, 0, 0)
-        ctx.text_align = ctx.CENTER
         if self.robber:
-            ctx.font_size = 20
-            ctx.move_to(self.centre[0], self.centre[1] + 7).text("Rob")
+            ctx.font_size = round(Hex.size * 0.8)
+            ctx.move_to(self.centre[0], self.centre[1]).text("Rob")
         else:
-            ctx.font_size = 30
+            ctx.font_size = Hex.size
             if self.resource != GameBoard.DESERT:
-                ctx.move_to(self.centre[0], self.centre[1] + 10)
+                ctx.move_to(self.centre[0], self.centre[1])
                 ctx.text(f"{self.number['roll']}")
 
 
@@ -414,6 +413,10 @@ class Player:
 
 class Selectable:
     """Base class for selectable locations on the game board."""
+
+    # Default colours
+    highlight = (0.8, 0.8, 0.8)
+    outline = (0.8, 0.8, 0.8)
 
     # Possible things this location may contain, the values here are the number of
     # victory points that the building is worth to the player who built it
@@ -433,8 +436,22 @@ class Selectable:
         # Whether to draw selection indicator
         self.selected = False
 
+        # Selection throb animation data
+        self.accum = 0
+        self.throb = 0
+        self.speed = 1000 # ms
+
     def is_empty(self):
         return self.contents == Selectable.EMPTY
+
+    def update(self, delta):
+        if self.selected:
+            self.accum = self.accum + delta
+            if self.accum > self.speed:
+                self.accum = self.accum - self.speed
+            self.throb = math.sin((TAU / self.speed) * self.accum)
+            # Keep throbbing within the range of 0 to 1
+            self.throb = (self.throb + 1) * 0.5
 
 
 class Settlement(Selectable):
@@ -454,7 +471,19 @@ class Settlement(Selectable):
         self.contents = Settlement.CITY
 
     def draw(self, ctx):
-        pass
+        if self.contents == Settlement.TOWN:
+            ctx.rgb(*self.player.colour)
+            ctx.arc(self.data[0], self.data[1], 4, 0, TAU, False).fill()
+            ctx.rgb(*Selectable.outline)
+            ctx.arc(self.data[0], self.data[1], 4, 0, TAU, False).stroke()
+        elif self.contents == Settlement.CITY:
+            ctx.rgb(*self.player.colour)
+            ctx.rectangle(self.data[0] - 4, self.data[1] - 4, 8, 8).fill()
+            ctx.rgb(*Selectable.outline)
+            ctx.rectangle(self.data[0] - 4, self.data[1] - 4, 8, 8).stroke()
+        if self.selected:
+            ctx.rgb(*Selectable.highlight)
+            ctx.arc(self.data[0], self.data[1], 5 + (4 * self.throb), 0, TAU, False).stroke()
 
 
 class Road(Selectable):
@@ -577,10 +606,17 @@ class GameBoard(Scene):
                     self.settlements.append(s)
 
     def update(self, delta):
-        pass
+        for r in self.roads:
+            r.update(delta)
+        for s in self.settlements:
+            s.update(delta)
 
     def draw(self, ctx):
         ctx.save()
+
+        ctx.text_align = ctx.CENTER
+        ctx.text_baseline = ctx.MIDDLE
+
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         for h in self.hexes:
             h.draw(ctx)
