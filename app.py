@@ -415,7 +415,7 @@ class Selectable:
     """Base class for selectable locations on the game board."""
 
     # Default colours
-    highlight = (0.8, 0.8, 0.8)
+    highlight = (1, 1, 1)
     outline = (0.8, 0.8, 0.8)
 
     # Possible things this location may contain
@@ -526,7 +526,7 @@ class GameBoard(Scene):
 
     # Kinds of resource
     SHEEP = {'kind':0, 'col': html_to_rgb('#228B22')}
-    WHEAT = {'kind':1, 'col': html_to_rgb('#ffc107')}
+    WHEAT = {'kind':1, 'col': html_to_rgb('#DAA520')}
     WOOD = {'kind':2, 'col': html_to_rgb('#993300')}
     BRICK = {'kind':3, 'col': html_to_rgb('#ff0000')}
     ORE = {'kind':4, 'col': html_to_rgb('#757575')}
