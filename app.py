@@ -365,9 +365,9 @@ class Hex:
             else:
                 node2 = self.nodes[0]
             if node1[0] <= node2[0]:
-                self.edges.append([node1, node2])
+                self.edges.append((node1, node2))
             else:
-                self.edges.append([node2, node1])
+                self.edges.append((node2, node1))
 
     def set_highlight(self, highlight):
         if self.highlight != highlight:
@@ -418,8 +418,7 @@ class Selectable:
     highlight = (0.8, 0.8, 0.8)
     outline = (0.8, 0.8, 0.8)
 
-    # Possible things this location may contain, the values here are the number of
-    # victory points that the building is worth to the player who built it
+    # Possible things this location may contain
     EMPTY = 0
 
     def __init__(self, data):
@@ -457,7 +456,8 @@ class Selectable:
 class Settlement(Selectable):
     """A node at which it is possible to build a settlement."""
 
-    # Victory point value of settlements
+    # Possible things this location may contain, the values here are the number of
+    # victory points that the building is worth to the player who built it
     TOWN = 1
     CITY = 2
 
@@ -471,6 +471,7 @@ class Settlement(Selectable):
         self.contents = Settlement.CITY
 
     def draw(self, ctx):
+        ctx.save()
         if self.contents == Settlement.TOWN:
             ctx.rgb(*self.player.colour)
             ctx.arc(self.data[0], self.data[1], 4, 0, TAU, False).fill()
@@ -484,12 +485,13 @@ class Settlement(Selectable):
         if self.selected:
             ctx.rgb(*Selectable.highlight)
             ctx.arc(self.data[0], self.data[1], 5 + (4 * self.throb), 0, TAU, False).stroke()
+        ctx.restore()
 
 
 class Road(Selectable):
     """An edge along which it is possible to build a road."""
 
-    # Victory point value of roads
+    # Possible things this location may contain
     ROAD = 1
 
     def build_road(self, player):
@@ -498,7 +500,24 @@ class Road(Selectable):
         self.contents = Road.ROAD
 
     def draw(self, ctx):
-        pass
+        ctx.save()
+        x0, y0 = self.data[0]
+        x1, y1 = self.data[1]
+        # Calculate the normalised edge vector
+        normalised = ((x0 - x1) / Hex.size, (y0 - y1) / Hex.size)
+        # Translate to one end of the edge and then rotate by the angle that
+        # the normalised vector points, any subsequent rectangles we draw will
+        # overlap the edge described by x0,y0 -> x1,y1
+        ctx.translate(x0, y0).rotate(math.pi - math.atan2(*normalised))
+        if self.contents == Road.ROAD:
+            ctx.rgb(*self.player.colour)
+            ctx.rectangle(-3, 0, 6, Hex.size).fill()
+            ctx.rgb(*Selectable.outline)
+            ctx.rectangle(-3, 0, 6, Hex.size).stroke()
+        if self.selected:
+            ctx.rgb(*Selectable.highlight)
+            ctx.rectangle(-3 - 4 * self.throb, 0, 6 + 8 * self.throb, Hex.size).stroke()
+        ctx.restore()
 
 
 class GameBoard(Scene):
