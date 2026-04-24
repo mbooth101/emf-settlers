@@ -65,7 +65,7 @@ class Menu(Scene):
     highlight = (0.8, 0.8, 0.8)
     enabled_fg = (0.8, 0.8, 0.8)
     disabled_fg = (0.4, 0.4, 0.4)
-    selected_fg = (0.01, 0.01, 0.01)
+    highlight_fg = (0.01, 0.01, 0.01)
 
     # Thickness of the ring around the edge of the sceen that we can use
     # to render the menu
@@ -76,6 +76,7 @@ class Menu(Scene):
         self.options = options
         self.callback = callback
         self.selection = -1
+        self.highlight = -1
 
     def set_message(self, message):
         """Set the message or question to display for the menu"""
@@ -102,7 +103,9 @@ class Menu(Scene):
         return opt['disabled'] if 'disabled' in opt else False
 
     def update(self, delta):
-        pass
+        if (self.callback and self.selection >= 0):
+            self.callback(self.selection)
+            self.selection = -1
 
     def draw(self, ctx):
         ctx.save()
@@ -122,7 +125,7 @@ class Menu(Scene):
 
         # Render the options
         for idx, option in enumerate(self.options):
-            self.draw_option(ctx, option, idx == self.selection)
+            self.draw_option(ctx, option, idx == self.highlight)
 
         ctx.restore()
 
@@ -151,7 +154,7 @@ class Menu(Scene):
             else:
                 ctx.rgb(*Menu.background).rectangle(-120, -120, 240, 240).fill()
 
-    def draw_option(self, ctx, option, selected):
+    def draw_option(self, ctx, option, highlight):
         ctx.save()
         ctx.font_size = 18
 
@@ -170,7 +173,7 @@ class Menu(Scene):
         # truncated by the clip mask
         if not Menu.is_option_disabled(option):
             ctx.save()
-            if selected:
+            if highlight:
                 ctx.rgb(*Menu.highlight)
             else:
                 if 'col' in option:
@@ -200,8 +203,8 @@ class Menu(Scene):
         if Menu.is_option_disabled(option):
             ctx.rgb(*Menu.disabled_fg)
         else:
-            if selected:
-                ctx.rgb(*Menu.selected_fg)
+            if highlight:
+                ctx.rgb(*Menu.highlight_fg)
             else:
                 if 'col' in option:
                     # Just needs to contrast with the overridden bg colour
@@ -226,12 +229,12 @@ class Menu(Scene):
     def handle_button_pressed(self, button):
         for idx, opt in enumerate(self.options):
             if opt['btn'] == button and not Menu.is_option_disabled(opt):
-                self.selection = idx
+                self.highlight = idx
 
     def handle_button_released(self, button):
-        if (self.callback and self.selection >= 0):
-            self.callback(self.selection)
-        self.selection = -1
+        for idx, opt in enumerate(self.options):
+            if opt['btn'] == button and self.highlight == idx:
+                self.selection = idx
 
 
 class MainMenu(Menu):
@@ -715,30 +718,6 @@ class Settlers(app.App):
             else:
                 self.state_next = Settlers.GAME
 
-    def _button_down(self, event: ButtonDownEvent):
-        button = event.button.name
-        # Send pressed event to current active scene only if the button was
-        # not already down (i.e. avoid repeat events for a held button)
-        if button not in self.buttons or not self.buttons[button]:
-            self.buttons[button] = True
-            self.scene.handle_button_pressed(button)
-
-    def _button_up(self, event: ButtonUpEvent):
-        button = event.button.name
-        # Send released event to current active scene only if the button was
-        # previously pressed
-        if button in self.buttons and self.buttons[button]:
-            self.buttons[button] = False
-            self.scene.handle_button_released(button)
-
-    async def _resume(self, event: RequestForegroundPushEvent):
-        # Disable firmware led pattern when foregrounded
-        eventbus.emit(PatternDisable())
-
-    async def _pause(self, event: RequestForegroundPopEvent):
-        # Renable firmware led pattern when backgrounded
-        eventbus.emit(PatternEnable())
-
     def enter_state(self):
         self.state_prev = self.state
         self.state = self.state_next
@@ -773,5 +752,30 @@ class Settlers(app.App):
 
     def draw(self, ctx):
         self.scene.draw(ctx)
+
+    def _button_down(self, event: ButtonDownEvent):
+        button = event.button.name
+        # Send pressed event to current active scene only if the button was
+        # not already down (i.e. avoid repeat events for a held button)
+        if button not in self.buttons or not self.buttons[button]:
+            self.buttons[button] = True
+            self.scene.handle_button_pressed(button)
+
+    def _button_up(self, event: ButtonUpEvent):
+        button = event.button.name
+        # Send released event to current active scene only if the button was
+        # previously pressed
+        if button in self.buttons and self.buttons[button]:
+            self.buttons[button] = False
+            self.scene.handle_button_released(button)
+
+    async def _resume(self, event: RequestForegroundPushEvent):
+        # Disable firmware led pattern when foregrounded
+        eventbus.emit(PatternDisable())
+
+    async def _pause(self, event: RequestForegroundPopEvent):
+        # Renable firmware led pattern when backgrounded
+        eventbus.emit(PatternEnable())
+
 
 __app_export__ = Settlers # pylint: disable=invalid-name
