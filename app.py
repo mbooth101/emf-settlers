@@ -147,12 +147,7 @@ class Menu(Scene):
             for idx, line in enumerate(self.message):
                 ctx.move_to(0, idx * ctx.font_size - line_offset).text(line)
         else:
-            # XXX: Avoid drawing images in the simulator due to bug
-            # https://github.com/emfcamp/badge-2024-software/issues/269
-            if sys.implementation.name == "micropython":
-                ctx.image(TITLE_IMG, -120, -120, 240, 240)
-            else:
-                ctx.rgb(*Menu.background).rectangle(-120, -120, 240, 240).fill()
+            ctx.image(TITLE_IMG, -120, -120, 240, 240)
 
     def draw_option(self, ctx, option, highlight):
         ctx.save()
