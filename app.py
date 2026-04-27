@@ -38,24 +38,7 @@ def html_to_rgb(html):
     return (r, g, b)
 
 
-class Scene:
-    """A base class than contains the collection of game objects that will be
-    rendered together in a single distinct scene."""
-
-    def update(self, delta):
-        """Updates the state of the current scene"""
-
-    def draw(self, ctx):
-        """Renders the current scene to the screen"""
-
-    def handle_button_pressed(self, button):
-        """Called when a button is pressed"""
-
-    def handle_button_released(self, button):
-        """Called when a button is released"""
-
-
-class Menu(Scene):
+class Menu:
     """An abstract menu scene that renders its options around the outside of the
     screen, one menu option can be assigned to each Tildagon button."""
 
@@ -133,6 +116,7 @@ class Menu(Scene):
         ctx.restore()
 
     def draw_background(self, ctx):
+        """Draw the menu background, override to customise what's drawn under the menu"""
         # Render message or title card if no message, either way we should
         # cover the whole screen to avoid seeing the system menu
         if self.message:
@@ -225,11 +209,13 @@ class Menu(Scene):
         ctx.restore()
 
     def handle_button_pressed(self, button):
+        """Called on the first occurance of a button down event for a given button"""
         for idx, opt in enumerate(self.options):
             if opt['btn'] == button and not Menu.is_option_disabled(opt):
                 self.menu_highlight = idx
 
     def handle_button_released(self, button):
+        """Called when a button up event happens after a button down event"""
         for idx, opt in enumerate(self.options):
             if opt['btn'] == button and self.menu_highlight == idx:
                 self.menu_selection = idx
@@ -736,9 +722,9 @@ class Settlers(app.App):
             self.exit = True
         if choice == MainMenu.NEW_GAME:
             if self.game:
-               self.state_next = Settlers.NEW_GAME_CAUTION
+                self.state_next = Settlers.NEW_GAME_CAUTION
             else:
-               self.state_next = Settlers.NUM_PLAYERS_MENU
+                self.state_next = Settlers.NUM_PLAYERS_MENU
         if choice == MainMenu.CONTINUE:
             self.state_next = Settlers.GAME
 
