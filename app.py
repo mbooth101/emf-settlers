@@ -294,7 +294,17 @@ class NextPlayerMenu(Menu):
         options = [{'btn': "C", 'name': "Continue"}]
         super().__init__(options, callback)
         self.set_message(["Pass the", "Tildagon to",
-            {'msg': f"{player.name}", 'col': player.colour}])
+            {'msg': player.name, 'col': player.colour}])
+
+
+class PlayerSetupMenu(Menu):
+
+    def __init__(self, callback, player, setup_mode):
+        options = [{'btn': "C", 'name': "Continue"}]
+        super().__init__(options, callback)
+        ordinal = 'first' if setup_mode == 1 else 'second'
+        self.set_message([{'msg': player.name, 'col': player.colour},
+            f"Place your {ordinal}", "town and road!"])
 
 
 class Hex:
@@ -572,6 +582,17 @@ class GameBoard(Menu):
     numbers = [FIVE, TWO, SIX, THREE, EIGHT, TEN, NINE, TWELVE, ELEVEN, FOUR,
                EIGHT, TEN, NINE, FOUR, FIVE, SIX, THREE, ELEVEN]
 
+    # Interactivity modes for allowing the the user to navigate and select
+    # things on the game board
+    ROBBER_MODE = 1
+    ROAD_MODE = 2
+    TOWN_MODE = 3
+    CITY_MODE = 4
+
+    # Setup modes
+    FIRST_SETUP = 1
+    SECOND_SETUP = 2
+
     game_options = [
         {'btn': "F", 'name': "Menu"},
         ]
@@ -658,15 +679,24 @@ class GameBoard(Menu):
         self.psq += self.players
         self.players.reverse()
 
+        # Whether we need to process the player setup queue or not
+        self.setup_mode = GameBoard.FIRST_SETUP
+
+        # Which interaction mode we are in
+        self.interactive_mode = None
+
     def next_player(self):
         """Select the next current player."""
         if self.psq:
             # If player setup queue still has entries, pop the next player
             # off the queue
+            if len(self.psq) <= len(self.players):
+                self.setup_mode = GameBoard.SECOND_SETUP
             self.current_player = self.psq.pop(0)
         else:
             # Otherwise select the player that comes after the current player
             # in the player list
+            self.setup_mode = None
             for idx, player in enumerate(self.players):
                 if self.current_player == player:
                     self.current_player = self.players[(idx + 1) % len(self.players)]
@@ -707,7 +737,8 @@ class Settlers(app.App):
     NUM_PLAYERS_MENU = 3
     PLAYER_COLOUR_MENU = 4
     NEXT_PLAYER = 5
-    GAME = 6
+    PLAYER_SETUP = 6
+    GAME = 7
 
     def __init__(self):
         self.exit = False
@@ -780,6 +811,12 @@ class Settlers(app.App):
                 self.state_next = Settlers.NEXT_PLAYER
 
     def next_player_cb(self, choice):
+        if self.game.setup_mode:
+            self.state_next = Settlers.PLAYER_SETUP
+        else:
+            self.state_next = Settlers.GAME
+
+    def player_setup_cb(self, choice):
         self.state_next = Settlers.GAME
 
     def game_menu_cb(self, choice):
@@ -812,6 +849,8 @@ class Settlers(app.App):
             if not self.game:
                 self.game = GameBoard(self.game_menu_cb, self.players)
             self.scene = NextPlayerMenu(self.next_player_cb, self.game.next_player())
+        if self.state == Settlers.PLAYER_SETUP:
+            self.scene = PlayerSetupMenu(self.player_setup_cb, self.game.current_player, self.game.setup_mode)
         if self.state == Settlers.GAME:
             self.scene = self.game
 
