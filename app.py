@@ -279,6 +279,9 @@ class PlayerColourMenu(Menu):
     def set_message_for_player(self, num):
         self.set_message(f"Player {num},\nchoose your\ncolour:")
 
+    def get_colour_for_choice(self, choice):
+        return self.options[choice]['col']
+
 
 class Hex:
     """Hexes are the games tiles. They have a resource kind, correspond to the value
@@ -699,7 +702,7 @@ class Settlers(app.App):
             self.state_next = Settlers.NUM_PLAYERS_MENU
             self.players.clear()
         else:
-            colour = self.scene.options[choice]['col']
+            colour = self.scene.get_colour_for_choice(choice)
             player_num = len(self.players) + 1
             self.players.append(Player(f"Player {player_num}", colour))
             if len(self.players) < self.num_players:
