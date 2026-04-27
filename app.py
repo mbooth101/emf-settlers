@@ -71,6 +71,9 @@ class Menu(Scene):
     # to render the menu
     width = 25
 
+    # Back is always first option
+    BACK = 0
+
     def __init__(self, options, callback):
         self.message = []
         self.options = options
@@ -234,7 +237,6 @@ class Menu(Scene):
 
 
 class MainMenu(Menu):
-    EXIT = 0
     NEW_GAME = 1
     CONTINUE = 2
 
@@ -248,7 +250,6 @@ class MainMenu(Menu):
 
 
 class NumPlayersMenu(Menu):
-    BACK = 0
     # No further constants, the chosen option index is the number of players
 
     def __init__(self, callback):
@@ -263,7 +264,6 @@ class NumPlayersMenu(Menu):
 
 
 class PlayerColourMenu(Menu):
-    BACK = 0
 
     def __init__(self, callback):
         options = [
@@ -685,20 +685,22 @@ class Settlers(app.App):
         eventbus.emit(PatternDisable())
 
     def main_menu_cb(self, choice):
-        if choice == MainMenu.EXIT:
+        if choice == Menu.BACK:
             self.exit = True
         if choice == MainMenu.NEW_GAME:
             self.state_next = Settlers.NUM_PLAYERS_MENU
+        if choice == MainMenu.CONTINUE:
+            self.state_next = Settlers.GAME
 
     def num_players_menu_cb(self, choice):
-        if choice == NumPlayersMenu.BACK:
+        if choice == Menu.BACK:
             self.state_next = Settlers.MAIN_MENU
         else:
             self.num_players = choice
             self.state_next = Settlers.PLAYER_COLOUR_MENU
 
     def player_colour_menu_cb(self, choice):
-        if choice == PlayerColourMenu.BACK:
+        if choice == Menu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
             self.players.clear()
         else:
