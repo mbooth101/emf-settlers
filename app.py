@@ -106,6 +106,7 @@ class Menu(Scene):
         if (self.callback and self.selection >= 0):
             self.callback(self.selection)
             self.selection = -1
+            self.highlight = -1
 
     def draw(self, ctx):
         ctx.save()
