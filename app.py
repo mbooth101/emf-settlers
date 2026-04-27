@@ -77,8 +77,8 @@ class Menu(Scene):
         self.message = []
         self.options = options
         self.callback = callback
-        self.selection = -1
-        self.highlight = -1
+        self.menu_selection = -1
+        self.menu_highlight = -1
 
     def set_message(self, message):
         """Set the message or question to display for the menu"""
@@ -105,10 +105,10 @@ class Menu(Scene):
         return opt['disabled'] if 'disabled' in opt else False
 
     def update(self, delta):
-        if (self.callback and self.selection >= 0):
-            self.callback(self.selection)
-            self.selection = -1
-            self.highlight = -1
+        if (self.callback and self.menu_selection >= 0):
+            self.callback(self.menu_selection)
+            self.menu_selection = -1
+            self.menu_highlight = -1
 
     def draw(self, ctx):
         ctx.save()
@@ -128,7 +128,7 @@ class Menu(Scene):
 
         # Render the options
         for idx, option in enumerate(self.options):
-            self.draw_option(ctx, option, idx == self.highlight)
+            self.draw_option(ctx, option, idx == self.menu_highlight)
 
         ctx.restore()
 
@@ -227,12 +227,12 @@ class Menu(Scene):
     def handle_button_pressed(self, button):
         for idx, opt in enumerate(self.options):
             if opt['btn'] == button and not Menu.is_option_disabled(opt):
-                self.highlight = idx
+                self.menu_highlight = idx
 
     def handle_button_released(self, button):
         for idx, opt in enumerate(self.options):
-            if opt['btn'] == button and self.highlight == idx:
-                self.selection = idx
+            if opt['btn'] == button and self.menu_highlight == idx:
+                self.menu_selection = idx
 
 
 class MainMenu(Menu):
@@ -521,7 +521,7 @@ class Road(Selectable):
         ctx.restore()
 
 
-class GameBoard(Scene):
+class GameBoard(Menu):
     """A gameboard is made of hexes, roads, and settlements. It also contains
     the players."""
 
@@ -557,8 +557,14 @@ class GameBoard(Scene):
     numbers = [FIVE, TWO, SIX, THREE, EIGHT, TEN, NINE, TWELVE, ELEVEN, FOUR,
                EIGHT, TEN, NINE, FOUR, FIVE, SIX, THREE, ELEVEN]
 
-    def __init__(self, players):
+    game_options = [
+        {'btn': "F", 'name': "Back"},
+        ]
+
+    def __init__(self, callback, players):
         """Creates a new game board for the given list of players."""
+        super().__init__(GameBoard.game_options, callback)
+
         self.players = players
         self.current_player = None
 
@@ -654,12 +660,13 @@ class GameBoard(Scene):
                 h.set_highlight(False)
 
     def update(self, delta):
+        super().update(delta)
         for r in self.roads:
             r.update(delta)
         for s in self.settlements:
             s.update(delta)
 
-    def draw(self, ctx):
+    def draw_background(self, ctx):
         ctx.save()
 
         ctx.text_align = ctx.CENTER
@@ -746,6 +753,10 @@ class Settlers(app.App):
             else:
                 self.state_next = Settlers.GAME
 
+    def game_menu_cb(self, choice):
+        if choice == Menu.BACK:
+            self.state_next = Settlers.MAIN_MENU
+
     def enter_state(self):
         self.state_prev = self.state
         self.state = self.state_next
@@ -758,14 +769,16 @@ class Settlers(app.App):
         # Load the scene associated with the new state
         if self.state == Settlers.MAIN_MENU:
             self.scene = MainMenu(self.main_menu_cb)
-            # TODO Enable continue if game in progress
-            self.scene.set_disabled([MainMenu.CONTINUE])
+            if not self.game:
+                self.scene.set_disabled([MainMenu.CONTINUE])
         if self.state == Settlers.NUM_PLAYERS_MENU:
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
         if self.state == Settlers.PLAYER_COLOUR_MENU:
             self.scene = PlayerColourMenu(self.player_colour_menu_cb)
         if self.state == Settlers.GAME:
-            self.scene = GameBoard(self.players)
+            if not self.game:
+                self.game = GameBoard(self.game_menu_cb, self.players)
+            self.scene = self.game
 
     def update(self, delta):
         if self.exit:
