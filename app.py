@@ -248,6 +248,18 @@ class MainMenu(Menu):
         super().__init__(options, callback)
 
 
+class NewGameCaution(Menu):
+    CONTINUE = 1
+
+    def __init__(self, callback):
+        options = [
+            {'btn': "F", 'name': "Back"},
+            {'btn': "C", 'name': "Continue"},
+            ]
+        super().__init__(options, callback)
+        self.set_message("Current game\nwill be erased!\nContinue?")
+
+
 class NumPlayersMenu(Menu):
     # No further constants, the chosen option index is the number of players
 
@@ -565,7 +577,7 @@ class GameBoard(Menu):
         """Creates a new game board for the given list of players."""
         super().__init__(GameBoard.game_options, callback)
 
-        self.players = players
+        self.players = players.copy()
         self.current_player = None
 
         # Two rings of hexes around the centre
@@ -687,9 +699,10 @@ class Settlers(app.App):
 
     # Game scenes
     MAIN_MENU = 1
-    NUM_PLAYERS_MENU = 2
-    PLAYER_COLOUR_MENU = 3
-    GAME = 4
+    NEW_GAME_CAUTION = 2
+    NUM_PLAYERS_MENU = 3
+    PLAYER_COLOUR_MENU = 4
+    GAME = 5
 
     def __init__(self):
         self.exit = False
@@ -722,9 +735,18 @@ class Settlers(app.App):
         if choice == Menu.BACK:
             self.exit = True
         if choice == MainMenu.NEW_GAME:
-            self.state_next = Settlers.NUM_PLAYERS_MENU
+            if self.game:
+               self.state_next = Settlers.NEW_GAME_CAUTION
+            else:
+               self.state_next = Settlers.NUM_PLAYERS_MENU
         if choice == MainMenu.CONTINUE:
             self.state_next = Settlers.GAME
+
+    def new_game_caution_cb(self, choice):
+        if choice == Menu.BACK:
+            self.state_next = Settlers.MAIN_MENU
+        if choice == NewGameCaution.CONTINUE:
+            self.state_next = Settlers.NUM_PLAYERS_MENU
 
     def num_players_menu_cb(self, choice):
         if choice == Menu.BACK:
@@ -736,7 +758,6 @@ class Settlers(app.App):
     def player_colour_menu_cb(self, choice):
         if choice == Menu.BACK:
             self.state_next = Settlers.NUM_PLAYERS_MENU
-            self.players.clear()
         else:
             colour = self.scene.get_colour_for_choice(choice)
             player_num = len(self.players) + 1
@@ -771,7 +792,11 @@ class Settlers(app.App):
             self.scene = MainMenu(self.main_menu_cb)
             if not self.game:
                 self.scene.set_disabled([MainMenu.CONTINUE])
+        if self.state == Settlers.NEW_GAME_CAUTION:
+            self.scene = NewGameCaution(self.new_game_caution_cb)
         if self.state == Settlers.NUM_PLAYERS_MENU:
+            self.game = None
+            self.players.clear()
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
         if self.state == Settlers.PLAYER_COLOUR_MENU:
             self.scene = PlayerColourMenu(self.player_colour_menu_cb)
