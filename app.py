@@ -57,7 +57,7 @@ class Menu:
     BACK = 0
 
     def __init__(self, options, callback):
-        self.message = []
+        self.message = None
         self.options = options
         self.callback = callback
         self.menu_selection = -1
@@ -69,9 +69,16 @@ class Menu:
         # lets split up the lines and we'll draw each line individually
         # TODO: Fix centred text containing newlines in uctx
         if not message:
-            self.message = []
+            self.message = None
         else:
-            self.message = message.splitlines()
+            if isinstance(message, str):
+                message = message.splitlines()
+            self.message = []
+            for line in message:
+                if isinstance(line, dict):
+                    self.message.append(line)
+                else:
+                    self.message.append({'msg': line, 'col': Menu.enabled_fg})
 
     def set_disabled(self, indices):
         """Set disabled flag on options corresponding to the given list of indices"""
@@ -111,7 +118,8 @@ class Menu:
 
         # Render the options
         for idx, option in enumerate(self.options):
-            self.draw_option(ctx, option, idx == self.menu_highlight)
+            if option:
+                self.draw_option(ctx, option, idx == self.menu_highlight)
 
         ctx.restore()
 
@@ -120,9 +128,8 @@ class Menu:
         # Render message or title card if no message, either way we should
         # cover the whole screen to avoid seeing the system menu
         if self.message:
-            ctx.font_size = 30
+            ctx.font_size = 28
             ctx.rgb(*Menu.background).rectangle(-120, -120, 240, 240).fill()
-            ctx.rgb(*Menu.enabled_fg)
             # Calculate offset to centre multi-line messages vertically
             if len(self.message) % 2 == 1:
                 line_offset = ((len(self.message) - 1) / 2) * ctx.font_size
@@ -132,7 +139,8 @@ class Menu:
             # newlines well for centred text
             # TODO: Fix centred text containing newlines in uctx
             for idx, line in enumerate(self.message):
-                ctx.move_to(0, idx * ctx.font_size - line_offset).text(line)
+                ctx.rgb(*line['col'])
+                ctx.move_to(0, idx * ctx.font_size - line_offset).text(line['msg'])
         else:
             ctx.image(TITLE_IMG, -120, -120, 240, 240)
 
@@ -211,13 +219,13 @@ class Menu:
     def handle_button_pressed(self, button):
         """Called on the first occurance of a button down event for a given button"""
         for idx, opt in enumerate(self.options):
-            if opt['btn'] == button and not Menu.is_option_disabled(opt):
+            if opt and opt['btn'] == button and not Menu.is_option_disabled(opt):
                 self.menu_highlight = idx
 
     def handle_button_released(self, button):
         """Called when a button up event happens after a button down event"""
         for idx, opt in enumerate(self.options):
-            if opt['btn'] == button and self.menu_highlight == idx:
+            if opt and opt['btn'] == button and self.menu_highlight == idx:
                 self.menu_selection = idx
 
 
@@ -278,6 +286,15 @@ class PlayerColourMenu(Menu):
 
     def get_colour_for_choice(self, choice):
         return self.options[choice]['col']
+
+
+class NextPlayerMenu(Menu):
+
+    def __init__(self, callback, player):
+        options = [{'btn': "C", 'name': "Continue"}]
+        super().__init__(options, callback)
+        self.set_message(["Pass the", "Tildagon to",
+            {'msg': f"{player.name}", 'col': player.colour}])
 
 
 class Hex:
@@ -556,7 +573,7 @@ class GameBoard(Menu):
                EIGHT, TEN, NINE, FOUR, FIVE, SIX, THREE, ELEVEN]
 
     game_options = [
-        {'btn': "F", 'name': "Back"},
+        {'btn': "F", 'name': "Menu"},
         ]
 
     def __init__(self, callback, players):
@@ -656,6 +673,7 @@ class GameBoard(Menu):
            # TODO implement dice self.dice.reset()
             for h in self.hexes:
                 h.set_highlight(False)
+        return self.current_player
 
     def update(self, delta):
         super().update(delta)
@@ -688,7 +706,8 @@ class Settlers(app.App):
     NEW_GAME_CAUTION = 2
     NUM_PLAYERS_MENU = 3
     PLAYER_COLOUR_MENU = 4
-    GAME = 5
+    NEXT_PLAYER = 5
+    GAME = 6
 
     def __init__(self):
         self.exit = False
@@ -758,7 +777,10 @@ class Settlers(app.App):
                 self.scene.set_message_for_player(len(self.players) + 1)
                 self.state_next = Settlers.PLAYER_COLOUR_MENU
             else:
-                self.state_next = Settlers.GAME
+                self.state_next = Settlers.NEXT_PLAYER
+
+    def next_player_cb(self, choice):
+        self.state_next = Settlers.GAME
 
     def game_menu_cb(self, choice):
         if choice == Menu.BACK:
@@ -786,9 +808,11 @@ class Settlers(app.App):
             self.scene = NumPlayersMenu(self.num_players_menu_cb)
         if self.state == Settlers.PLAYER_COLOUR_MENU:
             self.scene = PlayerColourMenu(self.player_colour_menu_cb)
-        if self.state == Settlers.GAME:
+        if self.state == Settlers.NEXT_PLAYER:
             if not self.game:
                 self.game = GameBoard(self.game_menu_cb, self.players)
+            self.scene = NextPlayerMenu(self.next_player_cb, self.game.next_player())
+        if self.state == Settlers.GAME:
             self.scene = self.game
 
     def update(self, delta):
