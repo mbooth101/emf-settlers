@@ -10,7 +10,6 @@ License: MIT
 import math
 import os
 import random
-import sys
 
 import app
 from system.eventbus import eventbus
@@ -355,8 +354,8 @@ class Hex:
         self.nodes = []
         for i in range(0, 6):
             angle = TAU * (0 - i) / 6
-            offset = [Hex.size * math.cos(angle), Hex.size * math.sin(angle)]
-            self.nodes.append([round(self.centre[0] + offset[0]), round(self.centre[1] + offset[1])])
+            off = [Hex.size * math.cos(angle), Hex.size * math.sin(angle)]
+            self.nodes.append([round(self.centre[0] + off[0]), round(self.centre[1] + off[1])])
 
         # Generate the list of pairs of screen coordinates for each of the sides of the hex
         self.edges = []
@@ -561,6 +560,7 @@ class GameBoard(Scene):
     def __init__(self, players):
         """Creates a new game board for the given list of players."""
         self.players = players
+        self.current_player = None
 
         # Two rings of hexes around the centre
         radius = 2
@@ -625,6 +625,33 @@ class GameBoard(Scene):
                     s = Settlement(node)
                     s.hexes.append(h)
                     self.settlements.append(s)
+
+        # Generate player setup queue, this determines the order in which the
+        # players place their initial settlements and roads. The order is
+        # player 1 to player n, then player n to player 1. This gives the
+        # first player first pick of the first settlement and road, and the
+        # last player first pick of the second settlement and road
+        self.psq = []
+        self.psq += self.players
+        self.players.reverse()
+        self.psq += self.players
+        self.players.reverse()
+
+    def next_player(self):
+        """Select the next current player."""
+        if self.psq:
+            # If player setup queue still has entries, pop the next player
+            # off the queue
+            self.current_player = self.psq.pop(0)
+        else:
+            # Otherwise select the player that comes after the current player
+            # in the player list
+            for idx, player in enumerate(self.players):
+                if self.current_player == player:
+                    self.current_player = self.players[(idx + 1) % len(self.players)]
+           # TODO implement dice self.dice.reset()
+            for h in self.hexes:
+                h.set_highlight(False)
 
     def update(self, delta):
         for r in self.roads:
