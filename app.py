@@ -492,12 +492,15 @@ class Settlement(Selectable):
     CITY = 2
 
     def build_town(self, player):
+        """Build a town at this location."""
         assert self.is_empty(), 'Town can only be built in empty location'
         self.player = player
         self.contents = Settlement.TOWN
 
     def build_city(self, player):
-        assert self.contents == Settlement.TOWN and self.player.name == player.name, 'City can only be built in place of one of your own towns'
+        """Upgrade a town to a city at this location."""
+        assert self.contents == Settlement.TOWN and self.player.name == player.name, \
+            'City can only be built in place of one of your own towns'
         self.contents = Settlement.CITY
 
     def draw(self, ctx):
@@ -525,6 +528,7 @@ class Road(Selectable):
     ROAD = 1
 
     def build_road(self, player):
+        """Build a road at this location."""
         assert self.is_empty(), 'Road can only be built in empty location'
         self.player = player
         self.contents = Road.ROAD
@@ -708,6 +712,83 @@ class GameBoard(Menu):
             for h in self.hexes:
                 h.set_highlight(False)
         return self.current_player
+
+    def build_road_candidates(self):
+        """Return the list of all roads that are valid candidates for building"""
+        candidates = []
+        # Road segments that belong to player
+        for r in [x for x in self.roads if x.player == self.current_player]:
+            # Settlement spaces that these road segments connect
+            for s in [x for x in self.settlements if x.data in r.data]:
+                # Empty road segments connecting those settlement spaces
+                for road in [x for x in self.roads if x.is_empty() and s.data in x.data]:
+                    if road not in candidates:
+                        candidates.append(road)
+        return candidates
+
+    def _can_build_town_at(self, settlement):
+        """Determines whether a town can be built at the given settlement according to proximity rules"""
+        # Find the road segments connecting the given settlement
+        for road in [x for x in self.roads if settlement.data in x.data]:
+            # Get adjacent settlements (those at the other end of the road segments)
+            for s in [x for x in self.settlements if x.data in road.data and x != settlement]:
+                # If all adjacent settlements are empty, it means that we are at least two road
+                # segments from any other built settlement, which is the required distance
+                if not s.is_empty():
+                    return False
+        return True
+
+    def build_setup_town_candidates(self):
+        """Return the list of all valid, empty, settlement spots"""
+        candidates = []
+        # Empty settlement spaces
+        for s in [x for x in self.settlements if x.is_empty()]:
+            # Settlement is a candidate if we can build there
+            if self._can_build_town_at(s) and s not in candidates:
+                candidates.append(s)
+        return candidates
+
+    def build_town_candidates(self):
+        """Return the list of all settlements that are valid candidates for towns to be built"""
+        candidates = []
+        # Road segments that belong to player
+        for r in [x for x in self.roads if x.player == self.current_player]:
+            # Empty settlement spaces at each end of the road segments
+            for s in [x for x in self.settlements if x.is_empty() and x.data in r.data]:
+                # Settlement is a candidate if we can build there
+                if self._can_build_town_at(s) and s not in candidates:
+                    candidates.append(s)
+        return candidates
+
+    def build_city_candidates(self):
+        """Return the list of all settlements that are valid candidates for being upgraded to city"""
+        candidates = []
+        # Settlement spaces that belong to player and contain a town
+        for s in [x for x in self.settlements if x.player == self.current_player and x.contents == Settlement.TOWN]:
+            candidates.append(s)
+        return candidates
+
+    def _select_prev_build_candidate(self, candidates):
+        if len(candidates) > 1:
+            for i in range(len(candidates)):
+                if candidates[i].selected:
+                    candidates[i].selected = False
+                    if i == 0:
+                        candidates[len(candidates) - 1].selected = True
+                    else:
+                        candidates[i - 1].selected = True
+                    break
+
+    def _select_next_build_candidate(self, candidates):
+        if len(candidates) > 1:
+            for i in range(len(candidates)):
+                if candidates[i].selected:
+                    candidates[i].selected = False
+                    if i == len(candidates) - 1:
+                        candidates[0].selected = True
+                    else:
+                        candidates[i + 1].selected = True
+                    break
 
     def update(self, delta):
         super().update(delta)
