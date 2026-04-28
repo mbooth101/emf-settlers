@@ -88,19 +88,19 @@ class Menu:
 
     def get_disabled(self):
         """Return list of indices of options that have the disabled flag set"""
-        return [idx for idx, option in enumerate(self.options) if Menu.is_option_disabled(option)]
+        return [idx for idx, option in enumerate(self.options) if Menu._is_option_disabled(option)]
 
     @staticmethod
-    def is_option_disabled(opt):
+    def _is_option_disabled(opt):
         return opt['disabled'] if 'disabled' in opt else False
 
-    def do_callback(self, choice):
+    def _do_callback(self, choice):
         if self.callback:
             self.callback(choice)
 
     def update(self, delta):
-        if (self.menu_selection >= 0):
-            self.do_callback(self.menu_selection)
+        if self.menu_selection >= 0:
+            self._do_callback(self.menu_selection)
             self.menu_selection = -1
             self.menu_highlight = -1
 
@@ -165,7 +165,7 @@ class Menu:
 
         # Render the selection highlight as a sector of a circle that is
         # truncated by the clip mask
-        if not Menu.is_option_disabled(option):
+        if not Menu._is_option_disabled(option):
             ctx.save()
             if highlight:
                 ctx.rgb(*Menu.highlight)
@@ -194,7 +194,7 @@ class Menu:
             ctx.restore()
 
         # Choose foreground colour
-        if Menu.is_option_disabled(option):
+        if Menu._is_option_disabled(option):
             ctx.rgb(*Menu.disabled_fg)
         else:
             if highlight:
@@ -223,7 +223,7 @@ class Menu:
     def handle_button_pressed(self, button):
         """Called on the first occurance of a button down event for a given button"""
         for idx, opt in enumerate(self.options):
-            if opt and opt['btn'] == button and not Menu.is_option_disabled(opt):
+            if opt and opt['btn'] == button and not Menu._is_option_disabled(opt):
                 self.menu_highlight = idx
 
     def handle_button_released(self, button):
@@ -471,6 +471,7 @@ class Selectable:
         self.speed = 1000 # ms
 
     def is_empty(self):
+        """Returns true if nothing is built at this selectable location."""
         return self.contents == Selectable.EMPTY
 
     def update(self, delta):
@@ -675,6 +676,7 @@ class GameBoard(Menu):
                     s = Settlement(node)
                     s.hexes.append(h)
                     self.settlements.append(s)
+        self.build_candidates = None
 
         # Generate player setup queue, this determines the order in which the
         # players place their initial settlements and roads. The order is
@@ -969,11 +971,11 @@ class Settlers(app.App):
             self.buttons[button] = False
             self.scene.handle_button_released(button)
 
-    async def _resume(self, event: RequestForegroundPushEvent):
+    async def _resume(self, _: RequestForegroundPushEvent):
         # Disable firmware led pattern when foregrounded
         eventbus.emit(PatternDisable())
 
-    async def _pause(self, event: RequestForegroundPopEvent):
+    async def _pause(self, _: RequestForegroundPopEvent):
         # Renable firmware led pattern when backgrounded
         eventbus.emit(PatternEnable())
 
