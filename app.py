@@ -94,9 +94,13 @@ class Menu:
     def is_option_disabled(opt):
         return opt['disabled'] if 'disabled' in opt else False
 
+    def do_callback(self, choice):
+        if self.callback:
+            self.callback(choice)
+
     def update(self, delta):
-        if (self.callback and self.menu_selection >= 0):
-            self.callback(self.menu_selection)
+        if (self.menu_selection >= 0):
+            self.do_callback(self.menu_selection)
             self.menu_selection = -1
             self.menu_highlight = -1
 
