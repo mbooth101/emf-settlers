@@ -492,6 +492,13 @@ class Settlement(Selectable):
     TOWN = 1
     CITY = 2
 
+    def prob_score(self):
+        """The probability score of the location is the sum of the probability of all adjacent hexes."""
+        score = 0
+        for h in self.hexes:
+            score = score + h.number['prob']
+        return score
+
     def build_town(self, player):
         """Build a town at this location."""
         assert self.is_empty(), 'Town can only be built in empty location'
