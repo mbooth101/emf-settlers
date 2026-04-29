@@ -21,11 +21,8 @@ TITLE_IMG = "/apps/mbooth101_emf_settlers/title.png"
 if os.getcwd() != "/":
     TITLE_IMG = os.getcwd() + TITLE_IMG
 
-# Radians in a full circle
-TAU = math.pi * 2
-
 # Radians between points on a hexagon
-HEX_INTERVAL = TAU / 6
+HEX_INTERVAL = math.pi / 3
 
 
 def html_to_rgb(html):
@@ -52,6 +49,7 @@ class Menu:
     # Thickness of the ring around the edge of the sceen that we can use
     # to render the menu
     width = 25
+    radius = 120 # Radius of the display/outer perimeter of the ring
 
     # Back is always first option
     BACK = 0
@@ -111,24 +109,16 @@ class Menu:
         ctx.text_baseline = ctx.MIDDLE
 
         # Render the background
-        self.draw_background(ctx)
-
-        # Define clip space so subsequent ops don't overwrite the title card
-        # or message, the menu options will be drawn in the outside perimeter
-        ctx.begin_path()
-        ctx.rectangle(-120, -120, 240, 240)
-        ctx.arc(0, 0, 120 - Menu.width, 0, TAU, True)
-        ctx.close_path().clip()
+        self._draw_background(ctx)
 
         # Render the options
         for idx, option in enumerate(self.options):
             if option:
-                self.draw_option(ctx, option, idx == self.menu_highlight)
+                self._draw_option(ctx, option, idx == self.menu_highlight)
 
         ctx.restore()
 
-    def draw_background(self, ctx):
-        """Draw the menu background, override to customise what's drawn under the menu"""
+    def _draw_background(self, ctx):
         # Render message or title card if no message, either way we should
         # cover the whole screen to avoid seeing the system menu
         if self.message:
@@ -148,13 +138,13 @@ class Menu:
         else:
             ctx.image(TITLE_IMG, -120, -120, 240, 240)
 
-    def draw_option(self, ctx, option, highlight):
+    def _draw_option(self, ctx, option, highlight):
         ctx.save()
         ctx.font_size = 18
 
         # Size of the arc in radians needed to highlight all of the text
         # Angle in radians is arc length over circle radius
-        arc_extent = ctx.text_width(option['name']) / 120
+        arc_extent = ctx.text_width(option['name']) / Menu.radius
 
         # Margin in radians used to centre the arc within the hex interval
         # associated with the botton position
@@ -178,19 +168,19 @@ class Menu:
             # in the direction of zero radians points right instead of up and
             # we consider the "A" button to be at position 0
             ctx.rotate((pos - 2) * HEX_INTERVAL)
-            # Draw the highlight arc
-            ctx.begin_path()
-            ctx.move_to(0, 0).arc(0, 0, 120, margin, HEX_INTERVAL - margin, False)
-            ctx.close_path().fill()
-            # Give the highlight rounded ends by adding a circle to each end
-            # of the highlight arc
+            # Vectors pointing from the origin to the start and end of the arc
             end_radius = Menu.width / 2
-            arc_start_x = math.cos(margin) * (120 - end_radius)
-            arc_start_y = math.sin(margin) * (120 - end_radius)
-            ctx.arc(arc_start_x, arc_start_y, end_radius, 0, TAU, False).fill()
-            arc_end_x = math.cos(HEX_INTERVAL - margin) * (120 - end_radius)
-            arc_end_y = math.sin(HEX_INTERVAL - margin) * (120 - end_radius)
-            ctx.arc(arc_end_x, arc_end_y, end_radius, 0, TAU, False).fill()
+            end_midpoint = Menu.radius - end_radius
+            x0, y0 = (math.cos(margin) * end_midpoint, math.sin(margin) * end_midpoint)
+            x1, y1 = (math.cos(HEX_INTERVAL - margin) * end_midpoint,
+                math.sin(HEX_INTERVAL - margin) * end_midpoint)
+            # Draw the option background arc
+            ctx.begin_path()
+            ctx.arc(x0, y0, end_radius, math.pi + margin, 2 * math.pi + margin, False)
+            ctx.arc(0, 0, Menu.radius, margin, HEX_INTERVAL - margin, False)
+            ctx.arc(x1, y1, end_radius, HEX_INTERVAL - margin, math.pi + (HEX_INTERVAL - margin), False)
+            ctx.arc(0, 0, Menu.radius - Menu.width, HEX_INTERVAL - margin, margin, True)
+            ctx.close_path().fill()
             ctx.restore()
 
         # Choose foreground colour
@@ -382,7 +372,7 @@ class Hex:
         # Generate the list of screen coordinates for each of the corners of the hex
         self.nodes = []
         for i in range(0, 6):
-            angle = TAU * (0 - i) / 6
+            angle = HEX_INTERVAL * (0 - i)
             off = [Hex.size * math.cos(angle), Hex.size * math.sin(angle)]
             self.nodes.append([round(self.centre[0] + off[0]), round(self.centre[1] + off[1])])
 
@@ -479,7 +469,7 @@ class Selectable:
             self.accum = self.accum + delta
             if self.accum > self.speed:
                 self.accum = self.accum - self.speed
-            self.throb = math.sin((TAU / self.speed) * self.accum)
+            self.throb = math.sin(((math.pi * 2) / self.speed) * self.accum)
             # Keep throbbing within the range of 0 to 1
             self.throb = (self.throb + 1) * 0.5
 
@@ -515,9 +505,9 @@ class Settlement(Selectable):
         ctx.save()
         if self.contents == Settlement.TOWN:
             ctx.rgb(*self.player.colour)
-            ctx.arc(self.data[0], self.data[1], 4, 0, TAU, False).fill()
+            ctx.arc(self.data[0], self.data[1], 4, 0, math.pi * 2, False).fill()
             ctx.rgb(*Selectable.outline)
-            ctx.arc(self.data[0], self.data[1], 4, 0, TAU, False).stroke()
+            ctx.arc(self.data[0], self.data[1], 4, 0, math.pi * 2, False).stroke()
         elif self.contents == Settlement.CITY:
             ctx.rgb(*self.player.colour)
             ctx.rectangle(self.data[0] - 4, self.data[1] - 4, 8, 8).fill()
@@ -525,7 +515,7 @@ class Settlement(Selectable):
             ctx.rectangle(self.data[0] - 4, self.data[1] - 4, 8, 8).stroke()
         if self.selected:
             ctx.rgb(*Selectable.highlight)
-            ctx.arc(self.data[0], self.data[1], 5 + (4 * self.throb), 0, TAU, False).stroke()
+            ctx.arc(self.data[0], self.data[1], 5 + (4 * self.throb), 0, math.pi * 2, False).stroke()
         ctx.restore()
 
 
@@ -806,7 +796,7 @@ class GameBoard(Menu):
         for s in self.settlements:
             s.update(delta)
 
-    def draw_background(self, ctx):
+    def _draw_background(self, ctx):
         ctx.save()
 
         ctx.text_align = ctx.CENTER
